@@ -1,23 +1,13 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CalendarWidget } from "@/components/Dashboard/CalendarWidget";
 import {
-  Calendar,
-  Users,
-  FileText,
-  GitBranch,
-  CheckCircle,
-  AlertCircle,
-  Plus,
+  Calendar, Users, FileText, GitBranch, CheckCircle, AlertCircle, Plus,
 } from "lucide-react";
 import {
   getProjectDashboardSummary,
@@ -59,13 +49,13 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
             listProjectFeedback(projectId),
           ]);
 
-        const currentProject =
-          projects.find((p) => p.id === projectId) ?? null;
+        const currentProject = projects.find((p) => p.id === projectId) ?? null;
         setProject(currentProject);
 
-        if (currentProject?.teamId) {
+        // 프로젝트 DTO에는 teamId가 없고 team "이름"만 존재 → 이름으로 매칭
+        if (currentProject?.team) {
           const currentTeam =
-            teams.find((t) => t.id === currentProject.teamId) ?? null;
+            teams.find((t) => t.name === currentProject.team) ?? null;
           setTeam(currentTeam);
         }
 
@@ -91,7 +81,9 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const tasksDone = summary?.assignments.closed ?? 0;
   const tasksInProgress = summary?.assignments.inProgress ?? 0;
   const progressRate = summary?.progressPct ?? 0;
-  const memberCount = team?.memberCount ?? summary?.memberCount ?? undefined;
+
+  // 팀원 수: 팀 DTO가 있으면 members.length, 없으면 대시보드 통계 fallback
+  const memberCount = team ? team.members.length : (summary?.memberCount ?? undefined);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -108,9 +100,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <FileText className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">
-                  {tasksInProgress}
-                </p>
+                <p className="text-2xl font-semibold">{tasksInProgress}</p>
                 <p className="text-sm text-muted-foreground">진행 중인 과제</p>
               </div>
             </div>
@@ -124,9 +114,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <Users className="h-5 w-5 text-chart-2" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">
-                  {memberCount ?? "N/A"}
-                </p>
+                <p className="text-2xl font-semibold">{memberCount ?? "N/A"}</p>
                 <p className="text-sm text-muted-foreground">팀원 수</p>
               </div>
             </div>
@@ -191,8 +179,8 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span>
                   최종 업데이트:{" "}
-                  {project?.updatedAt
-                    ? new Date(project.updatedAt).toLocaleDateString("ko-KR")
+                  {project?.lastUpdate
+                    ? new Date(project.lastUpdate).toLocaleDateString("ko-KR")
                     : "N/A"}
                 </span>
               </div>

@@ -5,5 +5,3 @@ export async function listTeams() {
   const { data } = await http.get<TeamListDto[]>("/teams");
   return data;
 }
-
-

@@ -1,18 +1,41 @@
-﻿/** 프로젝트/팀 (기존 페이지 호환용) */
+﻿/** ------------ Projects ------------- */
+export type ProjectStatus = "in-progress" | "review" | "completed" | "planning";
+
 export interface ProjectListDto {
   id: number;
-  name?: string;
-  status?: string;
-  teamId?: number;
-  createdAt?: string; // ISO
-  updatedAt?: string; // ISO
+  name: string;
+  description?: string;
+  status: ProjectStatus;
+  team: string;
+  lastUpdate: string;          // ISO
+  progress: number;            // 0~100
+  members: { id: number; name: string }[];
+  milestones: { completed: number; total: number };
+  nextDeadline: { task: string; date: string } | null;
 }
 
+/** ------------- Teams --------------- */
 export interface TeamListDto {
   id: number;
-  name?: string;
-  projectId?: number;
-  memberCount?: number;
+  name: string;
+  project: string;
+  description?: string;
+  leader: { name: string; email: string; avatar?: string } | null;
+  members: {
+    id: number;
+    name: string;
+    email: string;
+    avatar?: string;
+    role: "leader" | "member";
+    status: "active" | "inactive";
+  }[];
+  stats: {
+    commits: number;
+    meetings: number;
+    tasks: { completed: number; total: number };
+  };
+  createdAt?: string | null;
+  lastActivity?: string | null;
 }
 
 /** 피드백 (기존 페이지 호환) */

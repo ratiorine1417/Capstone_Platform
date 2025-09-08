@@ -21,11 +21,18 @@ import {
 } from "lucide-react";
 import { listProjects } from "@/api/projects";
 import { getProjectDashboardStatus } from "@/api/dashboard";
-import type { ProjectListDto, DashboardStatus } from "@/types/domain";
+import type { ProjectListDto, ProjectStatus, DashboardStatus } from "@/types/domain";
 
 interface AdminDashboardProps {
   projectId: number; // 현재는 단일 프로젝트 기준
 }
+
+const STATUS_LABEL: Record<ProjectStatus, string> = {
+  "in-progress": "진행중",
+  review: "검토중",
+  completed: "완료",
+  planning: "기획",
+};
 
 export function AdminDashboard({ projectId }: AdminDashboardProps) {
   const [projects, setProjects] = useState<ProjectListDto[]>([]);
@@ -182,18 +189,24 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
               {projects.map((project) => (
                 <div key={project.id} className="p-4 border rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-medium">
-                      {project.name ?? "이름 없음"}
-                    </h3>
-                    <Badge variant="secondary">{project.status ?? "N/A"}</Badge>
+                    <h3 className="font-medium">{project.name}</h3>
+                    <Badge variant="secondary">
+                      {STATUS_LABEL[project.status]}
+                    </Badge>
                   </div>
+
                   <p className="text-sm text-muted-foreground mb-3">
                     담당: 정보 없음
                   </p>
+
                   <div className="flex items-center justify-between text-sm">
-                    <span>팀: {project.teamId ?? "N/A"}</span>
-                    {/* TODO: 진행률 API 연동 */}
-                    <Progress value={50} className="w-24 h-2" />
+                    <span>팀: {project.team}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">
+                        업데이트: {new Date(project.lastUpdate).toLocaleDateString("ko-KR")}
+                      </span>
+                      <Progress value={project.progress} className="w-24 h-2" />
+                    </div>
                   </div>
                 </div>
               ))}
