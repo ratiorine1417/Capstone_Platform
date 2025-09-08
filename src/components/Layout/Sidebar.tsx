@@ -202,7 +202,7 @@ export function Sidebar({
           <BookOpen className="h-8 w-8 text-primary flex-shrink-0" />
           {!collapsed && (
             <div className="leading-5 tracking-tight">
-              <h1 className="text-xl font-semibold break-keep">캡스톤 관리 플랫폼</h1>
+              <h1 className="text-xl font-semibold break-keep">캡스톤 플랫폼</h1>
               <p className="text-sm text-muted-foreground">프로젝트 관리</p>
             </div>
           )}
