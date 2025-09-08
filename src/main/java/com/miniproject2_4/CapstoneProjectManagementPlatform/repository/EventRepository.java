@@ -11,7 +11,7 @@ import java.util.List;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    // from~to 구간과 '겹치는' 모든 이벤트 (스팬 케이스 포함)
+    // from~to 구간과 겹치는 모든 이벤트
     @Query("""
       select e
       from Event e
@@ -31,10 +31,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findByProject_IdOrderByStartAtAsc(Long projectId);
 
-    // 파생 쿼리는 정렬 방향까지 명시해야 함 (Asc 누락 시 메서드 이름 오류)
     List<Event> findByProject_IdAndStartAtBetweenOrderByStartAtAsc(
-            Long projectId,
-            LocalDateTime from,
-            LocalDateTime to
-    );
+            Long projectId, LocalDateTime from, LocalDateTime to);
 }
