@@ -124,9 +124,9 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* 리더 */}
+                {/* 팀장 */}
                 <div className="text-sm">
-                  <span className="font-medium">리더: </span>
+                  <span className="font-medium">팀장: </span>
                   {t.leader ? `${t.leader.name} (${t.leader.email})` : "미지정"}
                 </div>
 
@@ -145,7 +145,7 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={m.role === "leader" ? "default" : "outline"}>
-                            {m.role === "leader" ? "리더" : "팀원"}
+                            {m.role === "leader" ? "팀장" : "팀원"}
                           </Badge>
                           <Badge variant="outline">{m.status}</Badge>
                         </div>

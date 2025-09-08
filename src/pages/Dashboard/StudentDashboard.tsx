@@ -1,38 +1,94 @@
-﻿import { useState, useEffect, useMemo } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CalendarWidget } from "@/components/Dashboard/CalendarWidget";
 import {
-  Calendar, Users, FileText, GitBranch, CheckCircle, AlertCircle, Plus,
+  Calendar,
+  Users,
+  FileText,
+  GitBranch,
+  CheckCircle,
+  AlertCircle,
+  Video,
+  CalendarDays,
+  Plus,
 } from "lucide-react";
-import {
-  getProjectDashboardSummary,
-  getProjectDashboardDeadlines,
-} from "@/api/dashboard";
+import { getProjectDashboardSummary } from "@/api/dashboard";
 import { listProjectFeedback } from "@/api/feedback";
 import { listProjects } from "@/api/projects";
 import { listTeams } from "@/api/teams";
+import { listSchedulesInRange } from "@/api/schedules";
 import type {
   DashboardSummary,
-  DeadlineItem,
   FeedbackDto,
   ProjectListDto,
   TeamListDto,
+  ScheduleDto,
+  ScheduleType,
 } from "@/types/domain";
 
 interface StudentDashboardProps {
   projectId: number;
 }
 
+/** 유틸 */
+const toYMD = (d: Date) => d.toISOString().split("T")[0];
+const addDays = (d: Date, n: number) => {
+  const c = new Date(d);
+  c.setDate(c.getDate() + n);
+  return c;
+};
+const formatKDate = (date?: string | null, time?: string | null) => {
+  if (!date) return "N/A";
+  const iso = `${date}${time ? `T${time}:00` : "T00:00:00"}`;
+  return new Date(iso).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+const iconByType = (t: ScheduleType, cls = "h-4 w-4") => {
+  switch (t) {
+    case "deadline":
+      return <AlertCircle className={`${cls} text-red-500`} />;
+    case "meeting":
+      return <Users className={`${cls} text-green-500`} />;
+    case "presentation":
+      return <Video className={`${cls} text-blue-500`} />;
+    case "task":
+    default:
+      return <FileText className={`${cls} text-purple-500`} />;
+  }
+};
+const labelByType = (t: ScheduleType) => {
+  switch (t) {
+    case "deadline":
+      return "마감";
+    case "meeting":
+      return "회의";
+    case "presentation":
+      return "발표";
+    case "task":
+    default:
+      return "작업";
+  }
+};
+
 export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const [project, setProject] = useState<ProjectListDto | null>(null);
   const [team, setTeam] = useState<TeamListDto | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
+  const [upcoming, setUpcoming] = useState<ScheduleDto[]>([]); // ✅ 모든 일정 사용
   const [feedback, setFeedback] = useState<FeedbackDto[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,19 +96,19 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [projects, teams, summaryData, deadlinesData, feedbackData] =
-          await Promise.all([
-            listProjects(),
-            listTeams(),
-            getProjectDashboardSummary(projectId),
-            getProjectDashboardDeadlines(projectId),
-            listProjectFeedback(projectId),
-          ]);
+
+        // 프로젝트/팀/대시보드/피드백
+        const [projects, teams, summaryData, feedbackData] = await Promise.all([
+          listProjects(),
+          listTeams(),
+          getProjectDashboardSummary(projectId),
+          listProjectFeedback(projectId),
+        ]);
 
         const currentProject = projects.find((p) => p.id === projectId) ?? null;
         setProject(currentProject);
 
-        // 프로젝트 DTO에는 teamId가 없고 team "이름"만 존재 → 이름으로 매칭
+        // ProjectListDto엔 teamId가 없고 team "이름"만 있음 → 이름으로 매칭
         if (currentProject?.team) {
           const currentTeam =
             teams.find((t) => t.name === currentProject.team) ?? null;
@@ -60,8 +116,28 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         }
 
         setSummary(summaryData);
-        setDeadlines(deadlinesData);
         setFeedback(feedbackData);
+
+        // ✅ 다가오는 일정: DB기반 /schedules/range 에서 모든 타입을 사용
+        const today = new Date();
+        const end = addDays(today, 45); // 앞으로 45일 범위
+        const rows = await listSchedulesInRange({
+          from: toYMD(today),
+          to: toYMD(end),
+          projectId,
+        });
+
+        // 날짜가 있고 오늘 이후인 모든 일정 → 시간 포함 정렬
+        const upcomingAll = rows
+          .filter((s) => s.date) // 유효한 날짜만
+          .filter((s) => s.date! >= toYMD(today)) // 과거 제외
+          .sort((a, b) => {
+            const ad = `${a.date ?? ""}${a.time ?? ""}`;
+            const bd = `${b.date ?? ""}${b.time ?? ""}`;
+            return ad.localeCompare(bd);
+          });
+
+        setUpcoming(upcomingAll.slice(0, 3))
       } catch (error) {
         console.error("Failed to fetch student dashboard data:", error);
       } finally {
@@ -82,12 +158,10 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const tasksInProgress = summary?.assignments.inProgress ?? 0;
   const progressRate = summary?.progressPct ?? 0;
 
-  // 팀원 수: 팀 DTO가 있으면 members.length, 없으면 대시보드 통계 fallback
-  const memberCount = team ? team.members.length : (summary?.memberCount ?? undefined);
+  // 팀이 로드되면 members.length, 아니면 대시보드 통계 fallback
+  const memberCount = team ? team.members.length : summary?.memberCount ?? undefined;
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -114,7 +188,9 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <Users className="h-5 w-5 text-chart-2" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">{memberCount ?? "N/A"}</p>
+                <p className="text-2xl font-semibold">
+                  {memberCount ?? "N/A"}
+                </p>
                 <p className="text-sm text-muted-foreground">팀원 수</p>
               </div>
             </div>
@@ -199,28 +275,27 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
           </CardContent>
         </Card>
 
-        {/* 다가오는 일정 */}
+        {/* 다가오는 일정 — 모든 타입(DB 데이터) */}
         <Card>
           <CardHeader>
             <CardTitle>다가오는 일정</CardTitle>
-            <CardDescription>마감일이 임박한 과제들</CardDescription>
+            <CardDescription>회의 · 발표 · 작업 · 마감</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {deadlines.map((task, index) => (
+              {upcoming.map((s) => (
                 <div
-                  key={index}
+                  key={s.id}
                   className="flex items-center justify-between p-3 border rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    {iconByType(s.type)}
                     <div>
-                      <p className="font-medium text-sm">{task.title}</p>
+                      <p className="font-medium text-sm">{s.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        마감:{" "}
-                        {task.dueDate
-                          ? new Date(task.dueDate).toLocaleDateString("ko-KR")
-                          : "N/A"}
+                        <span className="mr-1">{labelByType(s.type)}:</span>
+                        {formatKDate(s.date, s.time)}
+                        {s.location ? ` · ${s.location}` : ""}
                       </p>
                     </div>
                   </div>
@@ -229,9 +304,10 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                   </Button>
                 </div>
               ))}
-              {deadlines.length === 0 && (
+
+              {upcoming.length === 0 && (
                 <div className="text-sm text-muted-foreground text-center py-4">
-                  예정된 마감이 없습니다.
+                  예정된 일정이 없습니다.
                 </div>
               )}
             </div>
@@ -239,7 +315,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         </Card>
       </div>
 
-      {/* 캘린더 위젯 */}
+      {/* 캘린더 위젯(이미 백엔드 연동) */}
       <CalendarWidget />
 
       {/* 최근 피드백 */}
