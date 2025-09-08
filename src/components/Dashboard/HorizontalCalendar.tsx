@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { listSchedulesInRange } from "@/api/schedules";
+import { createEvent } from "@/api/events";
 import type { ScheduleDto, ScheduleType, SchedulePriority } from "@/types/domain";
 
 interface HorizontalCalendarProps {
@@ -142,7 +143,7 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
     (data ?? []).map((s) => ({
       id: String(s.id),
       title: s.title ?? "",
-      date: s.date ?? "",                 // 서버 표준 필드
+      date: s.date ?? "",
       time: s.time ?? "",
       type: (s.type as ScheduleType) ?? "task",
       priority: (s.priority as SchedulePriority) ?? "low",
@@ -150,27 +151,23 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
     }));
 
   /** 데이터 로딩 */
+  const reload = async () => {
+    setLoading(true);
+    try {
+      const rows = await listSchedulesInRange({
+        from: fetchRange.from,
+        to: fetchRange.to,
+        projectId,
+      });
+      setEvents(mapToUi(rows));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const rows = await listSchedulesInRange({
-          from: fetchRange.from,
-          to: fetchRange.to,
-          projectId,
-        });
-        if (!mounted) return;
-        setEvents(mapToUi(rows));
-      } catch (e) {
-        console.error("Failed to load schedules:", e);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchRange.from, fetchRange.to, projectId]);
 
   const getEventsForDate = (date: Date) => {
@@ -188,7 +185,6 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
         return <AlertCircle className={`${cls} text-red-500`} />;
       case "meeting":
         return <Users className={`${cls} text-green-500`} />;
-      case "presentation":
       case "task":
       default:
         return <FileText className={`${cls} text-purple-500`} />;
@@ -209,7 +205,6 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
             회의
           </Badge>
         );
-      case "presentation":
       case "task":
       default:
         return (
@@ -243,6 +238,31 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
     return date.getMonth() === ref.getMonth() && date.getFullYear() === ref.getFullYear();
   };
 
+  /** 임시: 일정 추가(회의, 10:00~10:30) */
+  const onClickAdd = async () => {
+    // 선택된 날짜가 있으면 그 날, 아니면 보이는 범위의 시작일
+    const base = selectedDate ? new Date(selectedDate) : new Date(fetchRange.from);
+    const start = new Date(base);
+    start.setHours(10, 0, 0, 0);
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    // 서버가 LocalDateTime 파싱하므로 Z없이 전달
+    const toLocalIso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,19);
+
+    try {
+      setLoading(true);
+      await createEvent(projectId ?? 1, {
+        title: "새 일정",
+        type: "MEETING",
+        startAtIso: toLocalIso(start),
+        endAtIso: toLocalIso(end),
+        location: "온라인",
+      });
+      await reload();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className={`space-y-6 ${className ?? ""}`}>
       <Card>
@@ -260,22 +280,24 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentOffset((v) => v - 1)}
+                disabled={loading}
               >
                 <ChevronLeft className="h-4 w-4" />
                 {`이전 ${unitLabel}`}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setCurrentOffset(0)}>
+              <Button variant="outline" size="sm" onClick={() => setCurrentOffset(0)} disabled={loading}>
                 {`이번 ${unitLabel}`}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentOffset((v) => v + 1)}
+                disabled={loading}
               >
                 {`다음 ${unitLabel}`}
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="outline" disabled={loading}>
+              <Button size="sm" variant="outline" disabled={loading} onClick={onClickAdd}>
                 <Plus className="h-4 w-4 mr-2" />
                 일정 추가
               </Button>
@@ -450,7 +472,7 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
                 <p className="text-sm text-muted-foreground mb-4">
                   선택한 날짜에 등록된 일정이 없습니다.
                 </p>
-                <Button size="sm" variant="outline" disabled={loading}>
+                <Button size="sm" variant="outline" disabled={loading} onClick={onClickAdd}>
                   <Plus className="h-3 w-3 mr-2" />
                   일정 추가
                 </Button>
