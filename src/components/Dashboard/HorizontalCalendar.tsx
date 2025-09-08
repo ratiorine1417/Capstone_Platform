@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -14,26 +14,17 @@ import {
   Calendar as CalendarIcon,
   Clock,
   Plus,
-  AlertCircle,
-  Video,
   Users,
   FileText,
   ChevronDown,
   ChevronUp,
+  AlertCircle,
 } from "lucide-react";
+import { listSchedules } from "@/api/schedules";
+import type { ScheduleDto, ScheduleType } from "@/types/domain";
 
 interface HorizontalCalendarProps {
   className?: string;
-}
-
-interface ScheduleEvent {
-  id: number;
-  title: string;
-  date: string; // YYYY-MM-DD
-  time: string; // HH:mm
-  type: "deadline" | "presentation" | "meeting" | "task";
-  priority: "high" | "medium" | "low";
-  description?: string;
 }
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -41,203 +32,131 @@ const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 function toYMD(d: Date) {
   return d.toISOString().split("T")[0];
 }
-
 function monthLabel(d: Date) {
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
 }
-
 function weekLabel(start: Date) {
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   const sameMonth = start.getMonth() === end.getMonth();
-  const startPart = `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${
-    start.getDate()
-  }일`;
-  const endPart = `${sameMonth ? "" : `${end.getMonth() + 1}월 `}${
-    end.getDate()
-  }일`;
+  const startPart = `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일`;
+  const endPart = `${sameMonth ? "" : `${end.getMonth() + 1}월 `}${end.getDate()}일`;
   return `${startPart} - ${endPart}`;
 }
 
 export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
   const [currentOffset, setCurrentOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [isExpanded, setIsExpanded] = useState(false); // false: 주간, true: 월간
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [events, setEvents] = useState<ScheduleDto[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // 예시 일정 데이터 (오늘 기준)
-  const today = new Date();
-  const scheduleEvents: ScheduleEvent[] = [
-    {
-      id: 1,
-      title: "중간 보고서 제출",
-      date: toYMD(new Date(today.getTime() + 5 * 24 * 60 * 60 * 1000)),
-      time: "23:59",
-      type: "deadline",
-      priority: "high",
-      description: "AI 기반 스마트 캠퍼스 플랫폼 중간 보고서 제출",
-    },
-    {
-      id: 2,
-      title: "팀 Alpha 발표",
-      date: toYMD(new Date(today.getTime() + 8 * 24 * 60 * 60 * 1000)),
-      time: "14:00",
-      type: "presentation",
-      priority: "high",
-      description: "중간 발표 리허설",
-    },
-    {
-      id: 3,
-      title: "팀 미팅",
-      date: toYMD(new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000)),
-      time: "19:00",
-      type: "meeting",
-      priority: "medium",
-      description: "진행 상황 공유",
-    },
-    {
-      id: 4,
-      title: "멘토링 미팅",
-      date: toYMD(new Date(today.getTime() + 10 * 24 * 60 * 60 * 1000)),
-      time: "15:30",
-      type: "meeting",
-      priority: "medium",
-      description: "멘토와 진행 점검",
-    },
-    {
-      id: 5,
-      title: "발표 슬라이드 완성",
-      date: toYMD(new Date(today.getTime() + 12 * 24 * 60 * 60 * 1000)),
-      time: "18:00",
-      type: "task",
-      priority: "high",
-      description: "최종 발표용 슬라이드 완성",
-    },
-    {
-      id: 6,
-      title: "개발 계획 정리",
-      date: toYMD(today),
-      time: "16:00",
-      type: "meeting",
-      priority: "medium",
-      description: "개발 일정/역할 정리",
-    },
-    {
-      id: 7,
-      title: "다음 주 작업 계획",
-      date: toYMD(new Date(today.getTime() + 1 * 24 * 60 * 60 * 1000)),
-      time: "10:00",
-      type: "task",
-      priority: "high",
-      description: "다음 주 주요 작업 계획 수립",
-    },
-  ];
+  useEffect(() => {
+    const run = async () => {
+      try {
+        setLoading(true);
+        const data = await listSchedules();
+        setEvents(data ?? []);
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, []);
 
-  // 주 시작(일요일) 계산
-  const getStartOfWeek = (date: Date, weekOffset: number = 0) => {
+  // 주 시작(일요일)
+  const getStartOfWeek = (date: Date, weekOffset = 0) => {
     const start = new Date(date);
-    const day = start.getDay(); // 0:일 ~ 6:토
+    const day = start.getDay();
     start.setDate(start.getDate() - day + weekOffset * 7);
     start.setHours(0, 0, 0, 0);
     return start;
   };
 
-  // 해당 주 7일
   const getCurrentWeekDays = () => {
-    const startOfWeek = getStartOfWeek(today, currentOffset);
+    const startOfWeek = getStartOfWeek(new Date(), currentOffset);
     const days: Date[] = [];
     for (let i = 0; i < 7; i++) {
-      const date = new Date(startOfWeek);
-      date.setDate(startOfWeek.getDate() + i);
-      days.push(date);
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + i);
+      days.push(d);
     }
     return days;
   };
 
-  // 월 시작(1일) 계산
-  const getStartOfMonth = (date: Date, monthOffset: number = 0) => {
+  // 월 시작
+  const getStartOfMonth = (date: Date, monthOffset = 0) => {
     const start = new Date(date.getFullYear(), date.getMonth() + monthOffset, 1);
     start.setHours(0, 0, 0, 0);
     return start;
   };
 
-  // 월 달력(6행 x 7열 = 42칸) 생성
+  // 월 달력 42칸
   const getCurrentMonthDays = () => {
-    const startOfMonth = getStartOfMonth(today, currentOffset);
+    const startOfMonth = getStartOfMonth(new Date(), currentOffset);
     const endOfMonth = new Date(
       startOfMonth.getFullYear(),
       startOfMonth.getMonth() + 1,
       0
     );
 
-    const startDay = startOfMonth.getDay(); // 0:일
+    const startDay = startOfMonth.getDay();
     const days: Date[] = [];
 
-    // 이전 달 말일 채우기
+    // 이전달 말일
     for (let i = startDay - 1; i >= 0; i--) {
       const prev = new Date(startOfMonth);
       prev.setDate(prev.getDate() - (i + 1));
       days.push(prev);
     }
-
-    // 이번 달
+    // 이번달
     for (let d = 1; d <= endOfMonth.getDate(); d++) {
       days.push(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth(), d));
     }
-
-    // 다음 달 앞부분 채우기 (총 42칸)
+    // 다음달 앞부분
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       const next = new Date(endOfMonth);
       next.setDate(endOfMonth.getDate() + i);
       days.push(next);
     }
-
     return days;
   };
 
-  const weekDays = getCurrentWeekDays();
-  const monthDays = getCurrentMonthDays();
+  const weekDays = useMemo(getCurrentWeekDays, [currentOffset]);
+  const monthDays = useMemo(getCurrentMonthDays, [currentOffset]);
   const displayDays = isExpanded ? monthDays : weekDays;
   const currentReferenceDate = isExpanded
-    ? getStartOfMonth(today, currentOffset)
-    : getStartOfWeek(today, currentOffset);
+    ? getStartOfMonth(new Date(), currentOffset)
+    : getStartOfWeek(new Date(), currentOffset);
 
   const getEventsForDate = (date: Date) => {
     const ymd = toYMD(date);
-    return scheduleEvents.filter((e) => e.date === ymd);
+    return events.filter((e) => e.date === ymd);
   };
 
   const selectedDateEvents = selectedDate
-    ? getEventsForDate(new Date(selectedDate))
+    ? events.filter((e) => e.date === selectedDate)
     : [];
 
-  const getTypeIcon = (type: ScheduleEvent["type"], className = "h-3 w-3") => {
+  const getTypeIcon = (type: ScheduleType, cls = "h-3 w-3") => {
     switch (type) {
       case "deadline":
-        return <AlertCircle className={`${className} text-red-500`} />;
-      case "presentation":
-        return <Video className={`${className} text-blue-500`} />;
+        return <AlertCircle className={`${cls} text-red-500`} />;
       case "meeting":
-        return <Users className={`${className} text-green-500`} />;
+        return <Users className={`${cls} text-green-500`} />;
       case "task":
-        return <FileText className={`${className} text-purple-500`} />;
       default:
-        return <CalendarIcon className={`${className} text-gray-500`} />;
+        return <FileText className={`${cls} text-purple-500`} />;
     }
   };
 
-  const getTypeBadge = (type: ScheduleEvent["type"]) => {
+  const getTypeBadge = (type: ScheduleType) => {
     switch (type) {
       case "deadline":
         return (
           <Badge variant="destructive" className="text-xs">
             마감
-          </Badge>
-        );
-      case "presentation":
-        return (
-          <Badge variant="default" className="text-xs">
-            발표
           </Badge>
         );
       case "meeting":
@@ -247,21 +166,16 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
           </Badge>
         );
       case "task":
+      default:
         return (
           <Badge variant="outline" className="text-xs">
             작업
           </Badge>
         );
-      default:
-        return (
-          <Badge variant="outline" className="text-xs">
-            {type}
-          </Badge>
-        );
     }
   };
 
-  const getPriorityColor = (priority: ScheduleEvent["priority"]) => {
+  const getPriorityColor = (priority?: string | null) => {
     switch (priority) {
       case "high":
         return "border-l-red-500";
@@ -274,30 +188,21 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
     }
   };
 
-  const isToday = (d: Date) =>
-    d.toDateString() === new Date().toDateString();
-
+  const isToday = (d: Date) => d.toDateString() === new Date().toDateString();
   const isSelected = (d: Date) => selectedDate === toYMD(d);
-
-  const formatDateHeader = () => {
-    return isExpanded
-      ? monthLabel(currentReferenceDate)
-      : weekLabel(currentReferenceDate);
-  };
+  const formatDateHeader = () =>
+    isExpanded ? monthLabel(currentReferenceDate) : weekLabel(currentReferenceDate);
 
   const isCurrentMonth = (date: Date) => {
-    if (!isExpanded) return true; // 주간 모드에서는 전부 현재로 취급
-    const ref = getStartOfMonth(today, currentOffset);
-    return (
-      date.getMonth() === ref.getMonth() && date.getFullYear() === ref.getFullYear()
-    );
+    if (!isExpanded) return true;
+    const ref = getStartOfMonth(new Date(), currentOffset);
+    return date.getMonth() === ref.getMonth() && date.getFullYear() === ref.getFullYear();
   };
 
   const unitLabel = isExpanded ? "달" : "주";
 
   return (
     <div className={`space-y-6 ${className ?? ""}`}>
-      {/* 캘린더 카드 */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -317,11 +222,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
                 <ChevronLeft className="h-4 w-4" />
                 {`이전 ${unitLabel}`}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentOffset(0)}
-              >
+              <Button variant="outline" size="sm" onClick={() => setCurrentOffset(0)}>
                 {`이번 ${unitLabel}`}
               </Button>
               <Button
@@ -362,7 +263,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
             }`}
           >
             {displayDays.map((date) => {
-              const events = getEventsForDate(date);
+              const dayEvents = getEventsForDate(date);
               const key = toYMD(date);
               const inCurrentMonth = isCurrentMonth(date);
               const maxEvents = isExpanded ? 4 : 2;
@@ -392,18 +293,16 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
                   </div>
 
                   <div className="space-y-1">
-                    {events.slice(0, maxEvents).map((event) => (
+                    {dayEvents.slice(0, maxEvents).map((event) => (
                       <div
                         key={event.id}
                         className="text-xs p-1.5 rounded bg-muted/50 hover:bg-muted transition-colors"
                       >
                         <div className="flex items-center gap-1 mb-1">
                           {getTypeIcon(event.type, "h-2 w-2")}
-                          <span className="truncate font-medium">
-                            {event.title}
-                          </span>
+                          <span className="truncate font-medium">{event.title}</span>
                         </div>
-                        {isExpanded && (
+                        {isExpanded && event.time && (
                           <div className="text-muted-foreground flex items-center gap-1">
                             <Clock className="h-2 w-2" />
                             <span>{event.time}</span>
@@ -412,9 +311,9 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
                       </div>
                     ))}
 
-                    {events.length > maxEvents && (
+                    {dayEvents.length > maxEvents && (
                       <div className="text-xs text-muted-foreground text-center py-1 font-medium">
-                        +{events.length - maxEvents}개 더 보기
+                        +{dayEvents.length - maxEvents}개 더 보기
                       </div>
                     )}
                   </div>
@@ -485,7 +384,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
 
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                       <Clock className="h-4 w-4" />
-                      <span>{event.time}</span>
+                      <span>{event.time ?? "-"}</span>
                     </div>
 
                     {event.description && (

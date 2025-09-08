@@ -5,5 +5,3 @@ export async function listSchedules() {
   const { data } = await http.get<ScheduleDto[]>("/schedules");
   return data;
 }
-
-

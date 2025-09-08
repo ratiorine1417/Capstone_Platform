@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -15,7 +15,6 @@ import {
   Users,
   FileText,
   GitBranch,
-  Clock,
   CheckCircle,
   AlertCircle,
   Plus,
@@ -60,11 +59,13 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
             listProjectFeedback(projectId),
           ]);
 
-        const currentProject = projects.find((p) => p.id === projectId) ?? null;
+        const currentProject =
+          projects.find((p) => p.id === projectId) ?? null;
         setProject(currentProject);
 
         if (currentProject?.teamId) {
-          const currentTeam = teams.find((t) => t.id === currentProject.teamId) ?? null;
+          const currentTeam =
+            teams.find((t) => t.id === currentProject.teamId) ?? null;
           setTeam(currentTeam);
         }
 
@@ -80,6 +81,17 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
 
     fetchData();
   }, [projectId]);
+
+  const tasksTotal = useMemo(() => {
+    if (!summary) return 0;
+    const a = summary.assignments;
+    return (a?.open ?? 0) + (a?.inProgress ?? 0) + (a?.closed ?? 0);
+  }, [summary]);
+
+  const tasksDone = summary?.assignments.closed ?? 0;
+  const tasksInProgress = summary?.assignments.inProgress ?? 0;
+  const progressRate = summary?.progressPct ?? 0;
+  const memberCount = team?.memberCount ?? summary?.memberCount ?? undefined;
 
   if (loading) {
     return <div>Loading...</div>;
@@ -97,7 +109,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
               </div>
               <div>
                 <p className="text-2xl font-semibold">
-                  {summary?.tasksTotal ?? "N/A"}
+                  {tasksInProgress}
                 </p>
                 <p className="text-sm text-muted-foreground">진행 중인 과제</p>
               </div>
@@ -113,7 +125,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
               </div>
               <div>
                 <p className="text-2xl font-semibold">
-                  {team?.memberCount ?? "N/A"}
+                  {memberCount ?? "N/A"}
                 </p>
                 <p className="text-sm text-muted-foreground">팀원 수</p>
               </div>
@@ -143,7 +155,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
               </div>
               <div>
                 <p className="text-2xl font-semibold">
-                  {summary?.tasksDone ?? 0}/{summary?.tasksTotal ?? 0}
+                  {tasksDone}/{tasksTotal}
                 </p>
                 <p className="text-sm text-muted-foreground">완료 현황</p>
               </div>
@@ -165,17 +177,15 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <h3 className="font-medium">
                   {project?.name ?? "프로젝트명을 불러오는 중…"}
                 </h3>
-                <Badge variant="secondary">
-                  {summary?.progressRate ?? 0}% 진행
-                </Badge>
+                <Badge variant="secondary">{progressRate}% 진행</Badge>
               </div>
-              <Progress value={summary?.progressRate ?? 0} className="h-2" />
+              <Progress value={progressRate} className="h-2" />
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                <span>{team?.memberCount ?? "N/A"}명 팀원</span>
+                <span>{memberCount ?? "N/A"}명 팀원</span>
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -250,9 +260,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>최근 피드백</CardTitle>
-              <CardDescription>
-                교수/멘토로부터의 최신 피드백
-              </CardDescription>
+              <CardDescription>교수/멘토로부터의 최신 피드백</CardDescription>
             </div>
             <Button variant="outline" size="sm">
               <Plus className="h-4 w-4 mr-2" />

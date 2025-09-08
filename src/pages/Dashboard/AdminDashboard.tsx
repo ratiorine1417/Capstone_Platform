@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -16,7 +16,6 @@ import {
   Database,
   Activity,
   TrendingUp,
-  AlertCircle,
   Settings,
   Download,
 } from "lucide-react";
@@ -25,8 +24,7 @@ import { getProjectDashboardStatus } from "@/api/dashboard";
 import type { ProjectListDto, DashboardStatus } from "@/types/domain";
 
 interface AdminDashboardProps {
-  // API는 프로젝트 단위로 제공되어 있어 당장은 하나의 projectId만 사용합니다.
-  projectId: number;
+  projectId: number; // 현재는 단일 프로젝트 기준
 }
 
 export function AdminDashboard({ projectId }: AdminDashboardProps) {
@@ -38,8 +36,6 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
     const fetchData = async () => {
       try {
         setLoading(true);
-        // NOTE: 관리자 대시보드는 전역 API가 더 어울리지만,
-        // 지금은 프로젝트 목록과 특정 프로젝트의 상태를 예시로 사용합니다.
         const [projectData, statusData] = await Promise.all([
           listProjects(),
           getProjectDashboardStatus(projectId),
@@ -57,26 +53,19 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
   }, [projectId]);
 
   const systemStats = {
-    totalUsers: "N/A", // TODO: 사용자 수 API 필요
-    activeCourses: "N/A", // TODO: 과목 수 API 필요
+    totalUsers: "N/A", // TODO: 사용자 수 API
+    activeCourses: "N/A", // TODO: 과목 수 API
     totalProjects: projects.length,
-    systemUptime: 99.9, // 예시 값
+    systemUptime: 99.9,
   };
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "user_registration":
-        return <Users className="h-4 w-4 text-blue-500" />;
-      case "course_creation":
-        return <BookOpen className="h-4 w-4 text-green-500" />;
-      case "system_backup":
-        return <Database className="h-4 w-4 text-purple-500" />;
-      case "error":
-        return <AlertCircle className="h-4 w-4 text-red-500" />;
-      default:
-        return <Activity className="h-4 w-4 text-gray-500" />;
-    }
-  };
+  // 진행률을 바탕으로 헬스 레벨 산출
+  const healthLevel = useMemo<"healthy" | "warning" | "error">(() => {
+    const pct = status?.progressPct ?? 0;
+    if (pct >= 80) return "healthy";
+    if (pct >= 40) return "warning";
+    return "error";
+  }, [status]);
 
   const getStatusBadge = (val: string) => {
     const s = (val || "").toLowerCase();
@@ -172,7 +161,7 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 프로젝트(과목) 현황 */}
+        {/* 프로젝트 현황 */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -203,7 +192,7 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
                   </p>
                   <div className="flex items-center justify-between text-sm">
                     <span>팀: {project.teamId ?? "N/A"}</span>
-                    {/* TODO: 진행률 데이터 API 연동 필요 */}
+                    {/* TODO: 진행률 API 연동 */}
                     <Progress value={50} className="w-24 h-2" />
                   </div>
                 </div>
@@ -238,9 +227,7 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>시스템 상태</CardTitle>
-              <CardDescription>
-                현재 플랫폼/프로젝트의 상태 요약
-              </CardDescription>
+              <CardDescription>현재 플랫폼/프로젝트의 상태 요약</CardDescription>
             </div>
             <Button variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
@@ -254,20 +241,22 @@ export function AdminDashboard({ projectId }: AdminDashboardProps) {
               <div>
                 <p className="font-medium">서비스 헬스</p>
                 <p className="text-sm text-muted-foreground">
-                  현재 상태: {status?.health ?? "unknown"}
+                  현재 상태: {healthLevel} (진행률 {status?.progressPct ?? 0}%)
                 </p>
               </div>
-              <div className="text-right">
-                {getStatusBadge(status?.health ?? "unknown")}
-              </div>
+              <div className="text-right">{getStatusBadge(healthLevel)}</div>
             </div>
 
             <div className="flex items-center justify-between p-4 border rounded-lg">
               <div>
-                <p className="font-medium">에러/경고</p>
-                <p className="text-sm text-muted-foreground">API 필요</p>
+                <p className="font-medium">최종 업데이트</p>
+                <p className="text-sm text-muted-foreground">
+                  {status?.lastUpdate
+                    ? new Date(status.lastUpdate).toLocaleString("ko-KR")
+                    : "N/A"}
+                </p>
               </div>
-              <div className="text-right">{getStatusBadge("unknown")}</div>
+              <div className="text-right">{getStatusBadge(healthLevel)}</div>
             </div>
           </div>
         </CardContent>

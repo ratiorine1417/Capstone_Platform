@@ -17,5 +17,3 @@ http.interceptors.response.use(
     });
   }
 );
-
-

@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { HorizontalCalendar } from './HorizontalCalendar';
+﻿import React from "react";
+import { HorizontalCalendar } from "./HorizontalCalendar";
 
 interface CalendarWidgetProps {
   className?: string;
@@ -8,4 +8,3 @@ interface CalendarWidgetProps {
 export function CalendarWidget({ className }: CalendarWidgetProps) {
   return <HorizontalCalendar className={className} />;
 }
-
