@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/controller/dto/TeamListDto.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.controller.dto;
 
 import java.util.List;

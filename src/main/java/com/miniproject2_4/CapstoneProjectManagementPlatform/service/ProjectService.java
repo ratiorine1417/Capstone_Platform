@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/service/ProjectService.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.service;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.controller.dto.ProjectListDto;
@@ -42,7 +41,8 @@ public class ProjectService {
                     .toList();
 
             // 마일스톤(과제) 집계
-            List<Assignment> assigns = assignmentRepository.findByProject_Id(p.getId());
+            List<Assignment> assigns =
+                    assignmentRepository.findByProject_IdOrderByDueDateAsc(p.getId());
             int total = assigns.size();
             int completed = (int) assigns.stream()
                     .filter(a -> a.getStatus() == AssignmentStatus.COMPLETED)
@@ -76,15 +76,14 @@ public class ProjectService {
         }).toList();
     }
 
-    /** Project.Status -> 프론트 문자열 매핑 (null/미정/새 enum 값 대비) */
+    /** Project.Status -> 프론트 문자열 매핑 */
     private String mapStatus(Project.Status status) {
-        if (status == null) return "planning"; // null 가드 (switch에 null 넣으면 NPE)
+        if (status == null) return "planning"; // null 가드
         return switch (status) {
             case ACTIVE -> "in-progress";
             case REVIEW -> "review";
             case COMPLETED -> "completed";
             case PLANNING -> "planning";
-            // enum에 새 값이 추가되거나 우리가 누락한 값이 있을 때 기본값
             default -> "planning";
         };
     }

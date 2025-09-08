@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/service/TeamService.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.service;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.controller.dto.TeamListDto;
@@ -36,10 +35,10 @@ public class TeamService {
                     .map(Project::getTitle)
                     .orElse("미배정 프로젝트");
 
-            // 팀 멤버 전체 조회 (역할로 필터링하지 않고 이후에 구분)
+            // 팀 멤버 전체 조회
             var teamMembers = teamMemberRepository.findWithUserByTeamId(team.getId());
 
-            // 리더 1명 선택: String 역할을 enum 으로 변환해서 비교
+            // 리더 1명
             Optional<TeamListDto.Person> leaderOpt = teamMembers.stream()
                     .filter(tm -> toRole(tm.getRoleInTeam()) == TeamRole.LEADER)
                     .findFirst()
@@ -51,23 +50,23 @@ public class TeamService {
 
             TeamListDto.Person leader = leaderOpt.orElse(null);
 
-            // 멤버 DTO 변환 (enum -> 프론트 문자열로 매핑)
+            // 멤버 DTO
             List<TeamListDto.Member> members = teamMembers.stream()
                     .map(tm -> {
-                        TeamRole role = toRole(tm.getRoleInTeam()); // String/Enum 혼용 안전 처리
+                        TeamRole role = toRole(tm.getRoleInTeam());
                         String roleStr = (role == TeamRole.LEADER) ? "leader" : "member";
                         return new TeamListDto.Member(
                                 tm.getUser().getId(),
                                 tm.getUser().getName(),
                                 tm.getUser().getEmail(),
-                                null,        // avatar
-                                roleStr,     // 'leader' | 'member'
-                                "active"     // 별도 상태 없음 → 임시값
+                                null,
+                                roleStr,
+                                "active"
                         );
                     })
                     .toList();
 
-            // 통계(회의/과제)
+            // 통계(회의/과제) - 존재하는 리포지토리 메서드만 사용
             Long projectId = projectRepository.findByTeam_Id(team.getId())
                     .map(Project::getId)
                     .orElse(null);
@@ -76,9 +75,13 @@ public class TeamService {
             int totalTasks = 0;
             int completedTasks = 0;
             if (projectId != null) {
-                meetings = (int) eventRepository.countByProject_IdAndType(projectId, EventType.MEETING);
-                totalTasks = (int) assignmentRepository.countByProject_Id(projectId);
-                completedTasks = (int) assignmentRepository.countByProject_IdAndStatus(projectId, AssignmentStatus.COMPLETED);
+                meetings = (int) eventRepository.findByProject_IdOrderByStartAtAsc(projectId)
+                        .stream().filter(e -> e.getType() == EventType.MEETING).count();
+
+                var assigns = assignmentRepository.findByProject_IdOrderByDueDateAsc(projectId);
+                totalTasks = assigns.size();
+                completedTasks = (int) assigns.stream()
+                        .filter(a -> a.getStatus() == AssignmentStatus.COMPLETED).count();
             }
 
             TeamListDto.Stats stats = new TeamListDto.Stats(
@@ -104,18 +107,13 @@ public class TeamService {
         }).toList();
     }
 
-    /**
-     * TeamMember.roleInTeam 가 String/Enum 어느 쪽이든 안전하게 TeamRole로 변환
-     */
+    /** TeamMember.roleInTeam 이 String/Enum 어느 쪽이든 안전 변환 */
     private static TeamRole toRole(Object raw) {
         if (raw == null) return TeamRole.MEMBER;
         if (raw instanceof TeamRole r) return r;
         if (raw instanceof String s) {
-            try {
-                return TeamRole.valueOf(s);
-            } catch (IllegalArgumentException ignore) {
-                // 알 수 없는 문자열이면 기본값
-            }
+            try { return TeamRole.valueOf(s); }
+            catch (IllegalArgumentException ignore) { /* fall-through */ }
         }
         return TeamRole.MEMBER;
     }
