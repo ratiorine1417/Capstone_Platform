@@ -66,6 +66,7 @@ public class ScheduleService {
             String type = switch (e.getType() == null ? EventType.ETC : e.getType()) {
                 case MEETING -> "meeting";
                 case DEADLINE -> "deadline";
+                case PRESENTATION -> "presentation";
                 case ETC -> "task";
             };
             out.add(new ScheduleDto(
@@ -136,6 +137,7 @@ public class ScheduleService {
             String type = switch (e.getType() == null ? EventType.ETC : e.getType()) {
                 case MEETING -> "meeting";
                 case DEADLINE -> "deadline";
+                case PRESENTATION -> "presentation";
                 case ETC -> "task";
             };
             out.add(new ScheduleDto(
