@@ -1,17 +1,17 @@
 package com.miniproject2_4.CapstoneProjectManagementPlatform.repository;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.Event;
+import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.EventType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.EventType;
 
 public interface EventRepository extends JpaRepository<Event, Long> {
 
-    // from~to 구간과 '겹치는' 모든 이벤트(시작/끝이 범위 안이거나, 아예 범위를 덮는 케이스까지)
+    // from~to 구간과 '겹치는' 모든 이벤트 (스팬 케이스 포함)
     @Query("""
       select e
       from Event e
@@ -31,8 +31,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findByProject_IdOrderByStartAtAsc(Long projectId);
 
-    // 시작 시간이 범위 안인 이벤트(스팬 케이스는 빠질 수 있음)
-    List<Event> findByProject_IdAndStartAtBetweenOrderByStartAt(
+    // 파생 쿼리는 정렬 방향까지 명시해야 함 (Asc 누락 시 메서드 이름 오류)
+    List<Event> findByProject_IdAndStartAtBetweenOrderByStartAtAsc(
             Long projectId,
             LocalDateTime from,
             LocalDateTime to

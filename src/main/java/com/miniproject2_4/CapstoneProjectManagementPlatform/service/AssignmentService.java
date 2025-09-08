@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/service/AssignmentService.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.service;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.Assignment;
@@ -39,5 +38,14 @@ public class AssignmentService {
 
     public long countPending(Long projectId) {
         return assignmentRepository.countByProject_IdAndStatus(projectId, AssignmentStatus.PENDING);
+    }
+
+    /** 상태 변경 */
+    @org.springframework.transaction.annotation.Transactional
+    public Assignment changeStatus(Long assignmentId, AssignmentStatus status) {
+        Assignment a = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Assignment not found: " + assignmentId));
+        a.setStatus(status);
+        return a; // Dirty Checking으로 업데이트
     }
 }

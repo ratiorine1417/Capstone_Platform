@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/service/DashboardService.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.service;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.Assignment;
@@ -34,20 +33,20 @@ public class DashboardService {
             Assignments assignments,         // {open,inProgress,closed}
             Milestone milestone              // 다음 마일스톤(없으면 null)
     ) {
-        public record Assignments(int open, int inProgress, int closed) {}
-        public record Milestone(String title, String date) {}
+        public record Assignments(int open, int inProgress, int closed) { }
+        public record Milestone(String title, String date) { }
     }
 
     public record Status(
             int progressPct,
             String lastUpdate,
             List<String> actions
-    ) {}
+    ) { }
 
     public record DeadlineItem(
             String title,
             String dueDate
-    ) {}
+    ) { }
 
     /* ========= Queries ========= */
 

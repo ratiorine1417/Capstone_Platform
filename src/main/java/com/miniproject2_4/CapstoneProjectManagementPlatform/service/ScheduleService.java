@@ -30,11 +30,12 @@ public class ScheduleService {
     public List<ScheduleDto> listSchedules() {
         List<ScheduleDto> out = new ArrayList<>();
 
-        // 1) 과제 -> deadline로 노출
-        var proj = projectRepository.findAll().stream().findFirst().orElse(null); // 데모: 첫 프로젝트
+        // 1) 과제 -> deadline로 노출 (데모: 첫 프로젝트)
+        var proj = projectRepository.findAll().stream().findFirst().orElse(null);
         Long projectId = proj != null ? proj.getId() : null;
 
-        var assigns = (projectId == null) ? List.<Assignment>of()
+        var assigns = (projectId == null)
+                ? List.<Assignment>of()
                 : assignmentRepository.findByProject_IdOrderByDueDateAsc(projectId);
 
         for (var a : assigns) {
@@ -59,7 +60,8 @@ public class ScheduleService {
         }
 
         // 2) 이벤트
-        var events = (projectId == null) ? List.<Event>of()
+        var events = (projectId == null)
+                ? List.<Event>of()
                 : eventRepository.findByProject_IdOrderByStartAtAsc(projectId);
 
         for (var e : events) {

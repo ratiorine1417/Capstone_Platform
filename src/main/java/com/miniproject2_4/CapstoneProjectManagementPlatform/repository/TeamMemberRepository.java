@@ -1,4 +1,3 @@
-// src/main/java/com/miniproject2_4/CapstoneProjectManagementPlatform/repository/TeamMemberRepository.java
 package com.miniproject2_4.CapstoneProjectManagementPlatform.repository;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.TeamMember;
