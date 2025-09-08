@@ -11,6 +11,7 @@ import type { ScheduleDto, ScheduleType, EventType } from "@/types/domain";
 import { EventEditor } from "@/components/Schedule/EventEditor";
 import { deleteEvent } from "@/api/events";
 import { listProjects } from "@/api/projects";
+import { scheduleBus } from "@/lib/schedule-bus"; //사이드바 즉시 갱신용
 
 interface ScheduleManagementProps {
   userRole: UserRole;
@@ -146,6 +147,7 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
     try {
       await deleteEvent(projectId, idNum);
       await refresh();
+      scheduleBus.emitChanged(); //사이드바/다른 위젯 즉시 갱신
     } catch (e: any) {
       alert(e?.message ?? "삭제에 실패했습니다.");
     }
@@ -284,6 +286,7 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
         onSaved={async () => {
           setEditorOpen(false);
           await refresh();
+          scheduleBus.emitChanged(); //저장 직후 전역 갱신
         }}
       />
     </div>

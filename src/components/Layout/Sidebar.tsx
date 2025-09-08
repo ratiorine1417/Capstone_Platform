@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState, useCallback } from "react";
 import {
   Home,
   FolderOpen,
@@ -19,6 +19,7 @@ import { Badge } from "../ui/badge";
 import { UserRole, ActivePage } from "../../App";
 import { listSchedulesInRange } from "@/api/schedules";
 import type { ScheduleDto, SchedulePriority, ScheduleType } from "@/types/domain";
+import { scheduleBus } from "@/lib/schedule-bus"; // 전역 이벤트 버스
 
 interface SidebarProps {
   userRole: UserRole;
@@ -89,55 +90,75 @@ export function Sidebar({
 
   const menuItems = getMenuItems();
 
-  /* 다가오는 일정 로드 (백엔드) */
-  useEffect(() => {
+  /** 일정 로드 (재사용 가능하게 분리) */
+  const reloadUpcoming = useCallback(async () => {
     let alive = true;
-    (async () => {
-      try {
-        setLoadingUpcoming(true);
+    try {
+      setLoadingUpcoming(true);
 
-        const from = new Date();
-        const to = new Date();
-        to.setDate(from.getDate() + 14); // 2주
+      const from = new Date();
+      const to = new Date();
+      to.setDate(from.getDate() + 14); // 2주
 
-        const rows: ScheduleDto[] = await listSchedulesInRange({
-          from: toYMDLocal(from),
-          to: toYMDLocal(to),
-          projectId, // 명시적으로 전달. 없으면 백엔드 첫 프로젝트 사용
-        });
+      const rows: ScheduleDto[] = await listSchedulesInRange({
+        from: toYMDLocal(from),
+        to: toYMDLocal(to),
+        projectId, // 명시적으로 전달. 없으면 백엔드 첫 프로젝트 사용
+      });
 
-        if (!alive) return;
+      if (!alive) return;
 
-        const mapType = (t?: ScheduleType): UiSchedule["type"] =>
-          t === "deadline" || t === "meeting" || t === "task" || t === "presentation" ? t : "task";
-        const mapPriority = (p?: SchedulePriority): UiSchedule["priority"] =>
-          p === "high" || p === "medium" || p === "low" ? p : "low";
+      const mapType = (t?: ScheduleType): UiSchedule["type"] =>
+        t === "deadline" || t === "meeting" || t === "task" || t === "presentation" ? t : "task";
+      const mapPriority = (p?: SchedulePriority): UiSchedule["priority"] =>
+        p === "high" || p === "medium" || p === "low" ? p : "low";
 
-        const mapped: UiSchedule[] = (rows ?? [])
-          .filter((s) => !!s.date)
-          .map((s) => ({
-            id: s.id,
-            title: s.title ?? "(제목 없음)",
-            date: s.date!, // 필터링됨
-            time: s.time ?? undefined,
-            type: mapType(s.type),
-            priority: mapPriority(s.priority),
-          }))
-          .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")))
-          .slice(0, 3);
+      const mapped: UiSchedule[] = (rows ?? [])
+        .filter((s) => !!s.date)
+        .map((s) => ({
+          id: s.id,
+          title: s.title ?? "(제목 없음)",
+          date: s.date!, // 필터링됨
+          time: s.time ?? undefined,
+          type: mapType(s.type),
+          priority: mapPriority(s.priority),
+        }))
+        .sort((a, b) => (a.date + (a.time ?? "")).localeCompare(b.date + (b.time ?? "")))
+        .slice(0, 3);
 
-        setUpcoming(mapped);
-      } catch (e) {
-        console.error("Failed to load upcoming schedules:", e);
-        setUpcoming([]);
-      } finally {
-        if (alive) setLoadingUpcoming(false);
-      }
-    })();
+      setUpcoming(mapped);
+    } catch (e) {
+      console.error("Failed to load upcoming schedules:", e);
+      setUpcoming([]);
+    } finally {
+      setLoadingUpcoming(false);
+    }
     return () => {
       alive = false;
     };
   }, [projectId]);
+
+  /* 최초/프로젝트 변경 시 로드 + 전역 변경 이벤트 구독 */
+  useEffect(() => {
+    let unsub = () => {};
+    reloadUpcoming();
+
+    // 다른 화면(EventEditor, Calendar 등)에서 일정이 바뀌면 즉시 반영
+    unsub = scheduleBus.subscribe(() => {
+      reloadUpcoming();
+    });
+
+    return () => {
+      unsub();
+    };
+  }, [reloadUpcoming]);
+
+  /* 드롭다운을 펼칠 때마다 최신화 (펼친 직후 스냅 최신화) */
+  useEffect(() => {
+    if (showScheduleDropdown) {
+      reloadUpcoming();
+    }
+  }, [showScheduleDropdown, reloadUpcoming]);
 
   const formatScheduleDate = (dateStr: string) => {
     const date = new Date(dateStr + "T00:00:00"); // 로컬 렌더 안전

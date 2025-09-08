@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CalendarWidget } from "@/components/Dashboard/CalendarWidget";
 import { EventEditor } from "@/components/Schedule/EventEditor";
+import { scheduleBus } from "@/lib/schedule-bus";
 import {
   Calendar,
   Users,
@@ -399,6 +400,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         onSaved={async () => {
           setEditorOpen(false);
           await refreshSchedules();
+          scheduleBus.emitChanged();
         }}
       />
     </div>

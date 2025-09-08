@@ -21,8 +21,15 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { listSchedulesInRange } from "@/api/schedules";
-import { createEvent } from "@/api/events";
-import type { ScheduleDto, ScheduleType, SchedulePriority } from "@/types/domain";
+// 생성 API 직접 호출 제거 -> EventEditor 모달로 전환
+import type {
+  ScheduleDto,
+  ScheduleType,
+  SchedulePriority,
+  EventType,
+} from "@/types/domain";
+import { EventEditor } from "@/components/Schedule/EventEditor";
+import { scheduleBus } from "@/lib/schedule-bus";
 
 interface HorizontalCalendarProps {
   className?: string;
@@ -59,6 +66,18 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
   const [isExpanded, setIsExpanded] = useState(false);
   const [events, setEvents] = useState<UiEvent[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // 새 일정 모달 상태 (제목은 빈값으로 시작)
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorInitial, setEditorInitial] = useState<{
+    id?: number;
+    title: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    type: EventType;
+    location?: string;
+  } | undefined>(undefined);
 
   const today = new Date();
 
@@ -238,29 +257,27 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
     return date.getMonth() === ref.getMonth() && date.getFullYear() === ref.getFullYear();
   };
 
-  /** 임시: 일정 추가(회의, 10:00~10:30) */
-  const onClickAdd = async () => {
-    // 선택된 날짜가 있으면 그 날, 아니면 보이는 범위의 시작일
+  /** 일정 추가 버튼 → 모달 열기(제목 하드코딩 제거) */
+  const onClickAdd = () => {
+    // 기준 날짜: 선택된 날짜가 있으면 해당 날짜, 없으면 보이는 범위의 시작일
     const base = selectedDate ? new Date(selectedDate) : new Date(fetchRange.from);
+    // 기본 시간: 10:00 ~ 10:30
     const start = new Date(base);
     start.setHours(10, 0, 0, 0);
     const end = new Date(start.getTime() + 30 * 60 * 1000);
-    // 서버가 LocalDateTime 파싱하므로 Z없이 전달
-    const toLocalIso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,19);
 
-    try {
-      setLoading(true);
-      await createEvent(projectId ?? 1, {
-        title: "새 일정",
-        type: "MEETING",
-        startAtIso: toLocalIso(start),
-        endAtIso: toLocalIso(end),
-        location: "온라인",
-      });
-      await reload();
-    } finally {
-      setLoading(false);
-    }
+    const toHHMM = (d: Date) =>
+      `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+
+    setEditorInitial({
+      title: "",
+      date: toYMD(base),
+      startTime: toHHMM(start),
+      endTime: toHHMM(end),
+      type: "MEETING",
+      location: "온라인",
+    });
+    setEditorOpen(true);
   };
 
   return (
@@ -481,6 +498,19 @@ export function HorizontalCalendar({ className, projectId }: HorizontalCalendarP
           </CardContent>
         </Card>
       )}
+
+      {/* 새 일정 모달 (제목 직접 입력) */}
+      <EventEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        projectId={projectId ?? 1}
+        initial={editorInitial}
+        onSaved={async () => {
+          setEditorOpen(false);
+          await reload(); // 로컬 UI 갱신
+          scheduleBus.emitChanged();  // 전역 변경 알림 (사이드바 등)
+        }}
+      />
     </div>
   );
 }
