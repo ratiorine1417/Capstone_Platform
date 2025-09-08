@@ -9,7 +9,7 @@ import { UserRole } from "@/App";
 import { listSchedules } from "@/api/schedules";
 import type { ScheduleDto, ScheduleType, EventType } from "@/types/domain";
 import { EventEditor } from "@/components/Schedule/EventEditor";
-import { deleteEvent, listProjectEvents } from "@/api/events";
+import { deleteEvent } from "@/api/events";
 import { listProjects } from "@/api/projects";
 
 interface ScheduleManagementProps {
@@ -32,11 +32,6 @@ function scheduleTypeToEventType(t?: ScheduleType): EventType {
     default: return "ETC";
   }
 }
-function hhmm(d: Date) {
-  const h = `${d.getHours()}`.padStart(2, "0");
-  const m = `${d.getMinutes()}`.padStart(2, "0");
-  return `${h}:${m}`;
-}
 
 export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,9 +45,6 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<ScheduleDto | null>(null);
 
-  // E-<id> → 종료시간(HH:mm)
-  const [eventEndById, setEventEndById] = useState<Record<string, string>>({});
-
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -65,27 +57,11 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
     }
   }, []);
 
-  const rebuildEventEndMap = useCallback(async () => {
-    if (!projectId) return;
-    try {
-      const events = await listProjectEvents(projectId);
-      const map: Record<string, string> = {};
-      for (const ev of events) {
-        if (ev.endAt) {
-          map[`E-${ev.id}`] = hhmm(new Date(ev.endAt));
-        }
-      }
-      setEventEndById(map);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [projectId]);
-
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  // 첫 프로젝트 id 확보 (일정 생성/이벤트 조회에 필요)
+  // 첫 프로젝트 id 확보 (일정 생성/이벤트 수정/삭제에 필요)
   useEffect(() => {
     (async () => {
       try {
@@ -96,11 +72,6 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
       }
     })();
   }, []);
-
-  // 프로젝트 변경 시 종료시간 맵 구성
-  useEffect(() => {
-    rebuildEventEndMap();
-  }, [rebuildEventEndMap]);
 
   const getTypeIcon = (type?: ScheduleType) => {
     switch (type) {
@@ -175,7 +146,6 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
     try {
       await deleteEvent(projectId, idNum);
       await refresh();
-      await rebuildEventEndMap(); // 종료시간 맵도 즉시 갱신
     } catch (e: any) {
       alert(e?.message ?? "삭제에 실패했습니다.");
     }
@@ -220,65 +190,62 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
 
         <TabsContent value={selectedTab} className="mt-6">
           <div className="space-y-4">
-            {filteredSorted.map((s) => {
-              const end = eventEndById[s.id]; // E-<id>일 때만 존재
-              return (
-                <Card key={s.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-shrink-0 mt-1">{getTypeIcon(s.type)}</div>
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-medium">{s.title ?? "제목 없음"}</h3>
-                              <Badge variant="outline">{s.status}</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              담당자: {s.assignee ?? "정보 없음"}
-                            </p>
+            {filteredSorted.map((s) => (
+              <Card key={s.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 mt-1">{getTypeIcon(s.type)}</div>
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium">{s.title ?? "제목 없음"}</h3>
+                            <Badge variant="outline">{s.status}</Badge>
                           </div>
-                          <div className="text-right text-sm">
-                            <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>{formatDate(s.date)}</span>
-                              {s.time && (
-                                <span className="ml-1">
-                                  {s.time}
-                                  {end ? ` ~ ${end}` : ""}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            담당자: {s.assignee ?? "정보 없음"}
+                          </p>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm text-muted-foreground">
-                            위치: {s.location ?? "-"}
-                          </div>
-                          <div className="flex gap-2">
-                            {isEventId(s.id) ? (
-                              <>
-                                <Button size="sm" variant="outline" onClick={() => onEditClick(s)}>
-                                  편집
-                                </Button>
-                                <Button size="sm" variant="destructive" onClick={() => onDeleteClick(s)}>
-                                  <Trash2 className="h-3 w-3 mr-1" />
-                                  삭제
-                                </Button>
-                              </>
-                            ) : (
-                              <Button size="sm" variant="ghost" disabled>
-                                과제
-                              </Button>
+                        <div className="text-right text-sm">
+                          <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formatDate(s.date)}</span>
+                            {s.time && (
+                              <span className="ml-1">
+                                {s.time}
+                                {s.endTime ? ` ~ ${s.endTime}` : ""}
+                              </span>
                             )}
                           </div>
                         </div>
                       </div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">
+                          위치: {s.location ?? "-"}
+                        </div>
+                        <div className="flex gap-2">
+                          {isEventId(s.id) ? (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => onEditClick(s)}>
+                                편집
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => onDeleteClick(s)}>
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                삭제
+                              </Button>
+                            </>
+                          ) : (
+                            <Button size="sm" variant="ghost" disabled>
+                              과제
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           {filteredSorted.length === 0 && (
@@ -308,7 +275,7 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
                 title: editing.title ?? "",
                 date: editing.date ?? "",
                 startTime: editing.time ?? "",
-                endTime: eventEndById[editing.id] ?? "",
+                endTime: editing.endTime ?? "",
                 type: scheduleTypeToEventType(editing.type),
                 location: editing.location ?? "",
               }
@@ -317,7 +284,6 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
         onSaved={async () => {
           setEditorOpen(false);
           await refresh();
-          await rebuildEventEndMap(); // 저장 직후 종료시간 맵 즉시 갱신
         }}
       />
     </div>

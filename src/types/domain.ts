@@ -86,6 +86,7 @@ export interface ScheduleDto {
   priority: SchedulePriority;
   date?: string | null;        // "yyyy-MM-dd"
   time?: string | null;        // "HH:mm"
+  endTime?: string | null;     // "HH:mm" (이벤트만)
   assignee?: string | null;
   location?: string | null;
   /** 백엔드 필드는 projectTitle 이고, 기존 일부 코드가 projectName을 쓸 수 있어 둘 다 허용 */

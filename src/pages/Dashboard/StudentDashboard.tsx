@@ -27,7 +27,6 @@ import { listProjectFeedback } from "@/api/feedback";
 import { listProjects } from "@/api/projects";
 import { listTeams } from "@/api/teams";
 import { listSchedulesInRange } from "@/api/schedules";
-import { listProjectEventsInRange } from "@/api/events";
 import type {
   DashboardSummary,
   FeedbackDto,
@@ -45,8 +44,6 @@ const addDays = (d: Date, n: number) => {
 };
 const formatDateK = (isoOrYmd?: string | null) =>
   isoOrYmd ? new Date(isoOrYmd).toLocaleDateString("ko-KR") : "N/A";
-const hhmm = (d: Date) =>
-  `${`${d.getHours()}`.padStart(2, "0")}:${`${d.getMinutes()}`.padStart(2, "0")}`;
 
 /* 탭 타입 */
 type STab = "all" | "meeting" | "presentation" | "task" | "deadline";
@@ -86,24 +83,15 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const [tab, setTab] = useState<STab>("all");
   const [loading, setLoading] = useState(true);
 
-  // E-<id> → 종료시간(HH:mm)
-  const [eventEndById, setEventEndById] = useState<Record<string, string>>({});
-
   const refreshSchedules = useCallback(async () => {
     const today = new Date();
     const end = addDays(today, 45);
 
-    const [rows, events] = await Promise.all([
-      listSchedulesInRange({
-        from: toYMD(today),
-        to: toYMD(end),
-        projectId,
-      }),
-      listProjectEventsInRange(projectId, {
-        from: toYMD(today),
-        to: toYMD(end),
-      }),
-    ]);
+    const rows = await listSchedulesInRange({
+      from: toYMD(today),
+      to: toYMD(end),
+      projectId,
+    });
 
     const sorted = [...rows].sort((a, b) => {
       const at = `${a.date ?? ""}${a.time ?? ""}`;
@@ -111,15 +99,6 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
       return at.localeCompare(bt);
     });
     setSchedules(sorted);
-
-    // 종료 시간 맵 구성
-    const map: Record<string, string> = {};
-    for (const ev of events) {
-      if (ev.endAt) {
-        map[`E-${ev.id}`] = hhmm(new Date(ev.endAt));
-      }
-    }
-    setEventEndById(map);
   }, [projectId]);
 
   useEffect(() => {
@@ -147,7 +126,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         setSummary(summaryData);
         setFeedback(feedbackData);
 
-        // 일정 + 이벤트(종료시간)
+        // 일정
         await refreshSchedules();
       } catch (e) {
         console.error("Failed to load dashboard:", e);
@@ -332,7 +311,6 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                         `${item.date}T${item.time ? item.time : "00:00"}:00`
                       )
                     : null;
-                const end = eventEndById[item.id];
 
                 return (
                   <div
@@ -348,7 +326,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                             <>
                               <Clock className="h-3 w-3" />
                               {dateTime.toLocaleDateString("ko-KR")}
-                              {item.time && ` ${item.time}${end ? ` ~ ${end}` : ""}`}
+                              {item.time && ` ${item.time}${item.endTime ? ` ~ ${item.endTime}` : ""}`}
                             </>
                           )}
                           {item.location && (
