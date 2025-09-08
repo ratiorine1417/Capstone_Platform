@@ -22,7 +22,11 @@ export async function listProjectEventsInRange(
   return data;
 }
 
-/** 생성 */
+/**
+ * 생성
+ * - 백엔드는 ISO 문자열을 받습니다. (startAtIso/endAtIso)
+ * - type: MEETING | DEADLINE | ETC | PRESENTATION
+ */
 export async function createEvent(
   projectId: number,
   payload: {
@@ -40,7 +44,10 @@ export async function createEvent(
   return data;
 }
 
-/** 수정 */
+/**
+ * 수정
+ * - 부분 수정 가능
+ */
 export async function updateEvent(
   projectId: number,
   id: number,

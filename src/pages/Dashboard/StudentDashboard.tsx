@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { CalendarWidget } from "@/components/Dashboard/CalendarWidget";
+import { EventEditor } from "@/components/Schedule/EventEditor";
 import {
   Calendar,
   Users,
@@ -21,13 +22,12 @@ import {
   Video,
   Clock,
 } from "lucide-react";
-import {
-  getProjectDashboardSummary,
-} from "@/api/dashboard";
+import { getProjectDashboardSummary } from "@/api/dashboard";
 import { listProjectFeedback } from "@/api/feedback";
 import { listProjects } from "@/api/projects";
 import { listTeams } from "@/api/teams";
 import { listSchedulesInRange } from "@/api/schedules";
+import { listProjectEventsInRange } from "@/api/events";
 import type {
   DashboardSummary,
   FeedbackDto,
@@ -45,6 +45,8 @@ const addDays = (d: Date, n: number) => {
 };
 const formatDateK = (isoOrYmd?: string | null) =>
   isoOrYmd ? new Date(isoOrYmd).toLocaleDateString("ko-KR") : "N/A";
+const hhmm = (d: Date) =>
+  `${`${d.getHours()}`.padStart(2, "0")}:${`${d.getMinutes()}`.padStart(2, "0")}`;
 
 /* 탭 타입 */
 type STab = "all" | "meeting" | "presentation" | "task" | "deadline";
@@ -84,6 +86,42 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const [tab, setTab] = useState<STab>("all");
   const [loading, setLoading] = useState(true);
 
+  // E-<id> → 종료시간(HH:mm)
+  const [eventEndById, setEventEndById] = useState<Record<string, string>>({});
+
+  const refreshSchedules = useCallback(async () => {
+    const today = new Date();
+    const end = addDays(today, 45);
+
+    const [rows, events] = await Promise.all([
+      listSchedulesInRange({
+        from: toYMD(today),
+        to: toYMD(end),
+        projectId,
+      }),
+      listProjectEventsInRange(projectId, {
+        from: toYMD(today),
+        to: toYMD(end),
+      }),
+    ]);
+
+    const sorted = [...rows].sort((a, b) => {
+      const at = `${a.date ?? ""}${a.time ?? ""}`;
+      const bt = `${b.date ?? ""}${b.time ?? ""}`;
+      return at.localeCompare(bt);
+    });
+    setSchedules(sorted);
+
+    // 종료 시간 맵 구성
+    const map: Record<string, string> = {};
+    for (const ev of events) {
+      if (ev.endAt) {
+        map[`E-${ev.id}`] = hhmm(new Date(ev.endAt));
+      }
+    }
+    setEventEndById(map);
+  }, [projectId]);
+
   useEffect(() => {
     (async () => {
       try {
@@ -109,30 +147,15 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         setSummary(summaryData);
         setFeedback(feedbackData);
 
-        // 일정: 앞으로 45일 범위
-        const today = new Date();
-        const end = addDays(today, 45);
-        const rows = await listSchedulesInRange({
-          from: toYMD(today),
-          to: toYMD(end),
-          projectId,
-        });
-
-        // 날짜/시간 정렬
-        const sorted = [...rows].sort((a, b) => {
-          const at = `${a.date ?? ""}${a.time ?? ""}`;
-          const bt = `${b.date ?? ""}${b.time ?? ""}`;
-          return at.localeCompare(bt);
-        });
-
-        setSchedules(sorted);
+        // 일정 + 이벤트(종료시간)
+        await refreshSchedules();
       } catch (e) {
         console.error("Failed to load dashboard:", e);
       } finally {
         setLoading(false);
       }
     })();
-  }, [projectId]);
+  }, [projectId, refreshSchedules]);
 
   /* 카드 상단 요약 값 */
   const tasksTotal = useMemo(() => {
@@ -148,15 +171,13 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
   /* ============ 다가오는 일정 탭 필터 ============ */
   const upcomingItems = useMemo(() => {
     const nowYmd = toYMD(new Date());
-
-    const byTab = (s: ScheduleDto) =>
-      tab === "all" ? true : s.type === tab;
-
-    const futureOnly = (s: ScheduleDto) =>
-      (s.date ?? "") >= nowYmd; // 오늘 이후
-
+    const byTab = (s: ScheduleDto) => (tab === "all" ? true : s.type === tab);
+    const futureOnly = (s: ScheduleDto) => (s.date ?? "") >= nowYmd; // 오늘 이후
     return schedules.filter(byTab).filter(futureOnly).slice(0, 5);
   }, [tab, schedules]);
+
+  // 모달 (새 일정)
+  const [editorOpen, setEditorOpen] = useState(false);
 
   if (loading) return <div>Loading...</div>;
 
@@ -249,8 +270,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  최종 업데이트:{" "}
-                  {formatDateK(project?.lastUpdate)}
+                  최종 업데이트: {formatDateK(project?.lastUpdate)}
                 </span>
               </div>
             </div>
@@ -271,8 +291,17 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         {/* 다가오는 일정 - 탭 */}
         <Card>
           <CardHeader>
-            <CardTitle>다가오는 일정</CardTitle>
-            <CardDescription>회의 · 발표 · 작업 · 마감</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>다가오는 일정</CardTitle>
+                <CardDescription>회의 · 발표 · 작업 · 마감</CardDescription>
+              </div>
+              <Button size="sm" onClick={() => setEditorOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                새 일정
+              </Button>
+            </div>
+
             <div className="mt-3 flex flex-wrap gap-2">
               {([
                 { v: "all",    label: "전체" },
@@ -303,6 +332,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                         `${item.date}T${item.time ? item.time : "00:00"}:00`
                       )
                     : null;
+                const end = eventEndById[item.id];
 
                 return (
                   <div
@@ -318,7 +348,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                             <>
                               <Clock className="h-3 w-3" />
                               {dateTime.toLocaleDateString("ko-KR")}
-                              {item.time && ` ${item.time}`}
+                              {item.time && ` ${item.time}${end ? ` ~ ${end}` : ""}`}
                             </>
                           )}
                           {item.location && (
@@ -382,6 +412,17 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* 새 일정 모달 (저장 후 재조회) */}
+      <EventEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        projectId={projectId}
+        onSaved={async () => {
+          setEditorOpen(false);
+          await refreshSchedules();
+        }}
+      />
     </div>
   );
 }

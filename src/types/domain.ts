@@ -103,7 +103,12 @@ export interface Assignment {
 }
 
 /** ----- Event DTO (events API) ----- */
-export type EventType = "MEETING" | "DEADLINE" | "ETC";
+/**
+ * NOTE:
+ *  - 기존 합의는 MEETING | DEADLINE | ETC (→ meeting|deadline|task) 였으나
+ *  - 현재 DB에 PRESENTATION 이 존재하므로 프론트 타입에 포함합니다.
+ */
+export type EventType = "MEETING" | "DEADLINE" | "ETC" | "PRESENTATION";
 
 export interface EventDto {
   id: number;
