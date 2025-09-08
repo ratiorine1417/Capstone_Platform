@@ -1,5 +1,6 @@
 package com.miniproject2_4.CapstoneProjectManagementPlatform.controller;
 
+import com.miniproject2_4.CapstoneProjectManagementPlatform.controller.dto.AssignmentDto;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.Assignment;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.AssignmentStatus;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.service.AssignmentService;
@@ -15,18 +16,46 @@ public class AssignmentController {
 
     private final AssignmentService assignmentService;
 
+    // 요청 바디를 위한 간단한 레코드 (신규 파일 없이 내부에 정의)
+    public record CreateReq(String title, String dueDateIso, AssignmentStatus status) {}
+    public record UpdateReq(String title, String dueDateIso, AssignmentStatus status) {}
+
     // GET /api/projects/{projectId}/assignments
     @GetMapping
-    public List<Assignment> list(@PathVariable Long projectId) {
-        return assignmentService.listByProjectOrdered(projectId);
+    public List<AssignmentDto> list(@PathVariable Long projectId) {
+        return assignmentService.listByProjectOrdered(projectId)
+                .stream().map(AssignmentDto::of).toList();
+    }
+
+    // POST /api/projects/{projectId}/assignments
+    @PostMapping
+    public AssignmentDto create(@PathVariable Long projectId,
+                                @RequestBody CreateReq req) {
+        Assignment a = assignmentService.create(projectId, req.title(), req.dueDateIso(), req.status());
+        return AssignmentDto.of(a);
+    }
+
+    // PATCH /api/projects/{projectId}/assignments/{id}
+    @PatchMapping("/{id}")
+    public AssignmentDto update(@PathVariable Long projectId,
+                                @PathVariable Long id,
+                                @RequestBody UpdateReq req) {
+        Assignment a = assignmentService.update(id, req.title(), req.dueDateIso(), req.status());
+        return AssignmentDto.of(a);
     }
 
     // PATCH /api/projects/{projectId}/assignments/{id}/status?value=COMPLETED
     @PatchMapping("/{id}/status")
-    public Assignment changeStatus(@PathVariable Long projectId,
-                                   @PathVariable Long id,
-                                   @RequestParam("value") AssignmentStatus value) {
-        // projectId는 권한/소유성 체크 목적으로 path에 두고, 변경은 id 기준으로 처리
-        return assignmentService.changeStatus(id, value);
+    public AssignmentDto changeStatus(@PathVariable Long projectId,
+                                      @PathVariable Long id,
+                                      @RequestParam("value") AssignmentStatus value) {
+        Assignment a = assignmentService.changeStatus(id, value);
+        return AssignmentDto.of(a);
+    }
+
+    // DELETE /api/projects/{projectId}/assignments/{id}
+    @DeleteMapping("/{id}")
+    public void delete(@PathVariable Long projectId, @PathVariable Long id) {
+        assignmentService.delete(id);
     }
 }
