@@ -20,49 +20,46 @@ import {
   ChevronUp,
   AlertCircle,
 } from "lucide-react";
-import { listSchedules } from "@/api/schedules";
-import type { ScheduleDto, ScheduleType } from "@/types/domain";
+import { listSchedulesInRange } from "@/api/schedules";
+import type { ScheduleDto, ScheduleType, SchedulePriority } from "@/types/domain";
 
 interface HorizontalCalendarProps {
   className?: string;
+  /** 지정하지 않으면 백엔드가 첫 프로젝트로 처리 */
+  projectId?: number;
 }
 
 const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function toYMD(d: Date) {
-  return d.toISOString().split("T")[0];
-}
-function monthLabel(d: Date) {
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
-}
-function weekLabel(start: Date) {
+const toYMD = (d: Date) => d.toISOString().split("T")[0];
+const monthLabel = (d: Date) => `${d.getFullYear()}년 ${d.getMonth() + 1}월`;
+const weekLabel = (start: Date) => {
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   const sameMonth = start.getMonth() === end.getMonth();
   const startPart = `${start.getFullYear()}년 ${start.getMonth() + 1}월 ${start.getDate()}일`;
   const endPart = `${sameMonth ? "" : `${end.getMonth() + 1}월 `}${end.getDate()}일`;
   return `${startPart} - ${endPart}`;
-}
+};
 
-export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
+type UiEvent = {
+  id: string;
+  title: string;
+  date: string;   // YYYY-MM-DD
+  time: string;   // HH:mm
+  type: ScheduleType;
+  priority: SchedulePriority;
+  description?: string;
+};
+
+export function HorizontalCalendar({ className, projectId }: HorizontalCalendarProps) {
   const [currentOffset, setCurrentOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isExpanded, setIsExpanded] = useState(false);
-  const [events, setEvents] = useState<ScheduleDto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState<UiEvent[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-        const data = await listSchedules();
-        setEvents(data ?? []);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-  }, []);
+  const today = new Date();
 
   // 주 시작(일요일)
   const getStartOfWeek = (date: Date, weekOffset = 0) => {
@@ -73,33 +70,30 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
     return start;
   };
 
-  const getCurrentWeekDays = () => {
-    const startOfWeek = getStartOfWeek(new Date(), currentOffset);
-    const days: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startOfWeek);
-      d.setDate(startOfWeek.getDate() + i);
-      days.push(d);
-    }
-    return days;
-  };
-
-  // 월 시작
+  // 월 시작(1일)
   const getStartOfMonth = (date: Date, monthOffset = 0) => {
     const start = new Date(date.getFullYear(), date.getMonth() + monthOffset, 1);
     start.setHours(0, 0, 0, 0);
     return start;
   };
 
-  // 월 달력 42칸
-  const getCurrentMonthDays = () => {
-    const startOfMonth = getStartOfMonth(new Date(), currentOffset);
+  // 현재 주/월 그리드
+  const weekDays = useMemo(() => {
+    const start = getStartOfWeek(today, currentOffset);
+    return Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return d;
+    });
+  }, [today, currentOffset]);
+
+  const monthDays = useMemo(() => {
+    const startOfMonth = getStartOfMonth(today, currentOffset);
     const endOfMonth = new Date(
       startOfMonth.getFullYear(),
       startOfMonth.getMonth() + 1,
       0
     );
-
     const startDay = startOfMonth.getDay();
     const days: Date[] = [];
 
@@ -113,7 +107,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
     for (let d = 1; d <= endOfMonth.getDate(); d++) {
       days.push(new Date(startOfMonth.getFullYear(), startOfMonth.getMonth(), d));
     }
-    // 다음달 앞부분
+    // 다음달 앞부분 (42칸 유지)
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       const next = new Date(endOfMonth);
@@ -121,14 +115,63 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
       days.push(next);
     }
     return days;
-  };
+  }, [today, currentOffset]);
 
-  const weekDays = useMemo(getCurrentWeekDays, [currentOffset]);
-  const monthDays = useMemo(getCurrentMonthDays, [currentOffset]);
   const displayDays = isExpanded ? monthDays : weekDays;
   const currentReferenceDate = isExpanded
-    ? getStartOfMonth(new Date(), currentOffset)
-    : getStartOfWeek(new Date(), currentOffset);
+    ? getStartOfMonth(today, currentOffset)
+    : getStartOfWeek(today, currentOffset);
+  const unitLabel = isExpanded ? "달" : "주";
+
+  /** 조회 범위 계산 */
+  const fetchRange = useMemo(() => {
+    if (isExpanded) {
+      const start = getStartOfMonth(today, currentOffset);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+      return { from: toYMD(start), to: toYMD(end) };
+    } else {
+      const start = getStartOfWeek(today, currentOffset);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { from: toYMD(start), to: toYMD(end) };
+    }
+  }, [isExpanded, today, currentOffset]);
+
+  /** API → UI 모델 변환 */
+  const mapToUi = (data: ScheduleDto[]): UiEvent[] =>
+    (data ?? []).map((s) => ({
+      id: String(s.id),
+      title: s.title ?? "",
+      date: s.date ?? "",                 // 서버 표준 필드
+      time: s.time ?? "",
+      type: (s.type as ScheduleType) ?? "task",
+      priority: (s.priority as SchedulePriority) ?? "low",
+      description: s.description ?? undefined,
+    }));
+
+  /** 데이터 로딩 */
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        const rows = await listSchedulesInRange({
+          from: fetchRange.from,
+          to: fetchRange.to,
+          projectId,
+        });
+        if (!mounted) return;
+        setEvents(mapToUi(rows));
+      } catch (e) {
+        console.error("Failed to load schedules:", e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [fetchRange.from, fetchRange.to, projectId]);
 
   const getEventsForDate = (date: Date) => {
     const ymd = toYMD(date);
@@ -145,6 +188,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
         return <AlertCircle className={`${cls} text-red-500`} />;
       case "meeting":
         return <Users className={`${cls} text-green-500`} />;
+      case "presentation":
       case "task":
       default:
         return <FileText className={`${cls} text-purple-500`} />;
@@ -165,6 +209,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
             회의
           </Badge>
         );
+      case "presentation":
       case "task":
       default:
         return (
@@ -175,16 +220,15 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
     }
   };
 
-  const getPriorityColor = (priority?: string | null) => {
+  const getPriorityColor = (priority?: SchedulePriority) => {
     switch (priority) {
       case "high":
         return "border-l-red-500";
       case "medium":
         return "border-l-yellow-500";
       case "low":
-        return "border-l-green-500";
       default:
-        return "border-l-gray-300";
+        return "border-l-green-500";
     }
   };
 
@@ -195,11 +239,9 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
 
   const isCurrentMonth = (date: Date) => {
     if (!isExpanded) return true;
-    const ref = getStartOfMonth(new Date(), currentOffset);
+    const ref = getStartOfMonth(today, currentOffset);
     return date.getMonth() === ref.getMonth() && date.getFullYear() === ref.getFullYear();
   };
-
-  const unitLabel = isExpanded ? "달" : "주";
 
   return (
     <div className={`space-y-6 ${className ?? ""}`}>
@@ -233,7 +275,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
                 {`다음 ${unitLabel}`}
                 <ChevronRight className="h-4 w-4" />
               </Button>
-              <Button size="sm" variant="outline">
+              <Button size="sm" variant="outline" disabled={loading}>
                 <Plus className="h-4 w-4 mr-2" />
                 일정 추가
               </Button>
@@ -329,6 +371,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
               size="sm"
               onClick={() => setIsExpanded((v) => !v)}
               className="flex items-center gap-2"
+              disabled={loading}
             >
               {isExpanded ? (
                 <>
@@ -407,7 +450,7 @@ export function HorizontalCalendar({ className }: HorizontalCalendarProps) {
                 <p className="text-sm text-muted-foreground mb-4">
                   선택한 날짜에 등록된 일정이 없습니다.
                 </p>
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="outline" disabled={loading}>
                   <Plus className="h-3 w-3 mr-2" />
                   일정 추가
                 </Button>

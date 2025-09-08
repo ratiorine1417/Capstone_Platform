@@ -1,6 +1,7 @@
 import { http } from "@/api/http";
 import type { Assignment } from "@/types/domain";
 
+/** 목록 */
 export async function listAssignments(projectId: number) {
   const { data } = await http.get<Assignment[]>(
     `/projects/${projectId}/assignments`
@@ -8,6 +9,41 @@ export async function listAssignments(projectId: number) {
   return data;
 }
 
+/** 생성 */
+export async function createAssignment(
+  projectId: number,
+  payload: {
+    title: string;
+    /** "yyyy-MM-dd" 또는 ISO_LOCAL_DATE_TIME */
+    dueDateIso?: string;
+    status?: "COMPLETED" | "ONGOING" | "PENDING";
+  }
+) {
+  const { data } = await http.post<Assignment>(
+    `/projects/${projectId}/assignments`,
+    { title: payload.title, dueDateIso: payload.dueDateIso, status: payload.status }
+  );
+  return data;
+}
+
+/** 수정 */
+export async function updateAssignment(
+  projectId: number,
+  assignmentId: number,
+  payload: {
+    title?: string;
+    dueDateIso?: string;
+    status?: "COMPLETED" | "ONGOING" | "PENDING";
+  }
+) {
+  const { data } = await http.patch<Assignment>(
+    `/projects/${projectId}/assignments/${assignmentId}`,
+    payload
+  );
+  return data;
+}
+
+/** 상태 변경 */
 export async function changeAssignmentStatus(
   projectId: number,
   assignmentId: number,
@@ -19,4 +55,9 @@ export async function changeAssignmentStatus(
     { params: { value } }
   );
   return data;
+}
+
+/** 삭제 */
+export async function deleteAssignment(projectId: number, assignmentId: number) {
+  await http.delete(`/projects/${projectId}/assignments/${assignmentId}`);
 }

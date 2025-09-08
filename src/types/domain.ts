@@ -50,7 +50,7 @@ export interface DeadlineItem {
 }
 
 /** ----- Schedule DTO (백엔드 ScheduleDto) ----- */
-export type ScheduleType = "deadline" | "meeting" | "task";
+export type ScheduleType = "deadline" | "meeting" | "task" | "presentation";
 export type ScheduleStatus = "completed" | "in-progress" | "pending" | "scheduled";
 export type SchedulePriority = "high" | "medium" | "low";
 
@@ -65,6 +65,8 @@ export interface ScheduleDto {
   time?: string | null;        // "HH:mm"
   assignee?: string | null;
   location?: string | null;
+  /** 백엔드 필드는 projectTitle 이고, 기존 일부 코드가 projectName을 쓸 수 있어 둘 다 허용 */
+  projectTitle?: string | null;
   projectName?: string | null;
 }
 
@@ -75,4 +77,17 @@ export interface Assignment {
   title: string;
   dueDate: string;                         // ISO
   status: "COMPLETED" | "ONGOING" | "PENDING";
+}
+
+/** ----- Event DTO (events API) ----- */
+export type EventType = "MEETING" | "DEADLINE" | "ETC";
+
+export interface EventDto {
+  id: number;
+  projectId: number;
+  title: string;
+  startAt?: string; // ISO
+  endAt?: string;   // ISO
+  type?: EventType;
+  location?: string | null;
 }

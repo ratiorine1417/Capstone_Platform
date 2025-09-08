@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, FileText, Users } from "lucide-react";
+import { Calendar, FileText, Users, AlertCircle, Video } from "lucide-react";
 import { UserRole } from "@/App";
 import { listSchedules } from "@/api/schedules";
 import type { ScheduleDto, ScheduleType } from "@/types/domain";
@@ -36,15 +36,12 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
     fetchData();
   }, []);
 
-  const getTypeIcon = (type: ScheduleType) => {
+  const getTypeIcon = (type?: ScheduleType) => {
     switch (type) {
-      case "deadline":
-        return <FileText className="h-4 w-4 text-red-500" />;
-      case "meeting":
-        return <Users className="h-4 w-4 text-green-500" />;
-      case "task":
-      default:
-        return <FileText className="h-4 w-4 text-purple-500" />;
+      case "deadline": return <AlertCircle className="h-4 w-4 text-red-500" />;
+      case "meeting": return <Users className="h-4 w-4 text-green-500" />;
+      case "presentation": return <Video className="h-4 w-4 text-blue-500" />;
+      case "task": default: return <FileText className="h-4 w-4 text-purple-500" />;
     }
   };
 
@@ -74,7 +71,8 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
     const filtered = schedules.filter((s) => {
       const matches =
         (s.title?.toLowerCase().includes(q) ?? false) ||
-        (s.assignee?.toLowerCase().includes(q) ?? false);
+        (s.assignee?.toLowerCase().includes(q) ?? false) ||
+        (s.location?.toLowerCase().includes(q) ?? false);
       if (!matches) return false;
 
       const d = s.date ? new Date(s.date) : undefined;
@@ -112,7 +110,7 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
       {/* 검색 */}
       <div className="relative max-w-md">
         <Input
-          placeholder="일정 제목 또는 담당자로 검색…"
+          placeholder="일정 제목/담당자/위치로 검색…"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-3"
@@ -148,7 +146,7 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
                         <div className="text-right text-sm">
                           <div className="flex items-center gap-1 text-muted-foreground mb-1">
                             <Calendar className="h-3 w-3" />
-                            <span>{formatDate(s.date ?? undefined)}</span>
+                            <span>{formatDate(s.date)}</span>
                           </div>
                         </div>
                       </div>
