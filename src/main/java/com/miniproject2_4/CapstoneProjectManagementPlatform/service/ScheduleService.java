@@ -52,7 +52,9 @@ public class ScheduleService {
                     "deadline", status, "medium",
                     a.getDueDate() != null ? a.getDueDate().toLocalDate().format(D) : null,
                     a.getDueDate() != null ? a.getDueDate().toLocalTime().format(T) : null,
-                    null, "온라인",
+                    null, // endTime (과제는 종료시간 없음)
+                    null, // duration
+                    "온라인",
                     proj != null ? proj.getTitle() : null
             ));
         }
@@ -74,7 +76,9 @@ public class ScheduleService {
                     type, "scheduled", "low",
                     e.getStartAt() != null ? e.getStartAt().toLocalDate().format(D) : null,
                     e.getStartAt() != null ? e.getStartAt().toLocalTime().format(T) : null,
-                    null, e.getLocation(),
+                    e.getEndAt()   != null ? e.getEndAt().toLocalTime().format(T)   : null, // endTime 추가
+                    null, // duration
+                    e.getLocation(),
                     proj != null ? proj.getTitle() : null
             ));
         }
@@ -122,7 +126,9 @@ public class ScheduleService {
                         "deadline", status, "medium",
                         a.getDueDate().toLocalDate().format(D),
                         a.getDueDate().toLocalTime().format(T),
-                        null, "온라인",
+                        null, // endTime (과제는 종료시간 없음)
+                        null, // duration
+                        "온라인",
                         proj != null ? proj.getTitle() : null
                 ));
             }
@@ -145,7 +151,9 @@ public class ScheduleService {
                     type, "scheduled", "low",
                     e.getStartAt() != null ? e.getStartAt().toLocalDate().format(D) : null,
                     e.getStartAt() != null ? e.getStartAt().toLocalTime().format(T) : null,
-                    null, e.getLocation(),
+                    e.getEndAt()   != null ? e.getEndAt().toLocalTime().format(T)   : null, // endTime 추가
+                    null, // duration
+                    e.getLocation(),
                     proj != null ? proj.getTitle() : null
             ));
         }
