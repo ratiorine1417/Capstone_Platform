@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: taskloom-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: taskloom
+      MYSQL_USER: taskloom_user
+      MYSQL_PASSWORD: taskloom_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./sql:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mariadb_data:

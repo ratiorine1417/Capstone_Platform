@@ -1,0 +1,42 @@
+spring:
+  profiles:
+    active: dev
+
+  datasource:
+    url: jdbc:mariadb://localhost:3307/taskloom
+    username: taskloom_user
+    password: taskloom_password
+    driver-class-name: org.mariadb.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: never
+      # (루트 sql/data.sql을 병행 사용하려면)
+      # data-locations: classpath:data.sql, file:./sql/data.sql
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.capstone.pm: DEBUG
+    org.springframework.security: DEBUG
+
+app:
+  cors:
+    allowed-origins: http://localhost:5194
+  jwt:
+    # ★ 임시용 비밀키(B64). 운영에서는 512bit 이상의 랜덤 키를 Base64로 넣어라.
+    secret: "dGhpc19pc19hX2Rldl9zZWNyZXRfZm9yX3Rhc2tsb29tX3BsZWFzZV9jaGFuZ2VfbWU="
+    access-exp-minutes: 60
+    issuer: "taskloom"

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm cache clean:*)",
+      "Bash(node:*)",
+      "Bash(npx shadcn:*)",
+      "Bash(pkill:*)",
+      "Bash(find:*)",
+      "Bash(sed:*)",
+      "Bash(npm run fix:imports:*)",
+      "Bash(npm run verify:radix:*)",
+      "Bash(curl:*)",
+      "Read(//c/mybackend/SpringBoot/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

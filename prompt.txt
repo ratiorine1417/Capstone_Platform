@@ -1,0 +1,83 @@
+당신은 시니어 풀스택 페어프로그래머 겸 레포 세터입니다. 
+다음 요구를 정확히 이행하는 '한 번의 커밋 시퀀스'를 생성하세요. 
+각 단계는 "계획 → 생성/수정 파일 목록 → 코드 → 로컬 빌드/테스트 커맨드" 순으로 제시하고, 단계별로 빌드/테스트가 통과되는 최소 변경 단위로 끊어 진행합니다.
+
+[프로젝트]
+이름: capstone-pm
+목표: 캡스톤 프로젝트 관리 플랫폼 9일 MVP
+스택:
+- BackEnd: Spring Boot 3, Java 17, Maven, Spring Data JPA, MariaDB, Spring Security + JWT
+- FrontEnd: React + Vite, TypeScript, React Router, Redux Toolkit(+RTK Query), UI는 MUI
+- Infra: Docker Compose (MariaDB), Flyway(또는 schema.sql+data.sql) 시드
+- 테스트/품질: JUnit5/MockMvc, ESLint/Prettier, React Testing Library/Jest, 간단 CI 스크립트
+(테스트/도구 레퍼런스는 평가 문서의 권장안을 따른다)
+
+모노레포 구조(예시):
+/
+├─ backend/ (Spring Boot, maven)
+├─ frontend/ (Vite React TS)
+├─ infra/ (docker-compose.yml, db init)
+├─ docs/ (README, API/도메인/화면 설계 초안)
+└─ sql/ (schema.sql, data.sql)
+=> 리포 구조 예시는 평가 문서 형식을 따른다.
+
+[핵심 기능(MVP 범위)]
+1) 일정/캘린더·Gantt: Sprint, Milestone CRUD + dueAt 기반 D-Day 뱃지
+2) 상태관리(칸반): Backlog/Doing/Review/Blocked/Done 컬럼, WIP 제한 필드
+3) 스레드 코멘트/멘션: 태스크/마일스톤/파일 단위 스레드, @displayName 멘션
+4) Auth & RBAC: JWT 기반 로그인/가입, 역할= TeamMember/TeamLead/Instructor(read)/Admin
+5) 깃허브 자동연결(Webhook): push/pull_request 수신, HMAC(X-Hub-Signature-256) 검증, 커밋/PR 텍스트의 TASK-\d+ 정규식 매칭 → 해당 Task에 IntegrationRef 저장/표시
+6) 파일 보관함(산출물 버저닝): Artifact 업로드(파일/URL), version, changeLog, uploadedAt, uploadedBy, 마감(dueAt)과 업로드 시간 비교 지연 칩 표시
+7) 위키(간단 MD CRUD): 팀 규칙/런북/ENV 템플릿 페이지
+
+[도메인(엔티티)]
+User(id, email, displayName, role)
+Team(id, name) / TeamMember(teamId, userId, role)
+Project(id, teamId, name, startAt, endAt)
+Sprint(id, projectId, name, startAt, endAt)
+Milestone(id, projectId, name, dueAt)
+Task(id, projectId, sprintId?, title, status, assigneeId?, dueAt, labels[])
+Comment(id, targetType, targetId, authorId, body, createdAt, threadRootId)
+Artifact(id, projectId, taskId?, milestoneId?, name, version, urlOrFileRef, changeLog, uploadedAt, uploadedBy)
+IntegrationRef(id, taskId, type='github', refType='commit|pr', url, refId)
+WikiPage(id, projectId, path, title, body, updatedAt, updatedBy)
+
+[백엔드 세부 요구]
+- 패키지: com.capstone.pm
+- REST API: /auth, /projects, /sprints, /milestones, /tasks, /comments, /artifacts, /wiki, /webhooks/github
+- 전역 예외처리, 표준 응답 래퍼(코드/메시지/data), Pageable 목록 API
+- Spring Security: 로그인(이메일+비밀번호), JWT 발급/검증, 역할별 권한 가드
+- MariaDB 설정과 Docker Compose, 로컬 프로파일(dev) 구분
+- 초기 마이그레이션 또는 schema.sql+data.sql에 데모 데이터(seed)
+
+[프론트엔드 세부 요구]
+- 페이지: 로그인/회원가입, 대시보드(임박 마감·Blocked Top3·진행률·최근 PR/Artifact), 칸반 보드, 캘린더/Gantt, 파일 보관함, 위키
+- 상태: RTK Query로 백엔드 API 연동, 토큰 인터셉터
+- 접근성/테스트: React Testing Library 기본 테스트 2~3개 생성
+- 디자인: MUI 테마, D-Day 칩/PR 뱃지/Blocked 칩 등 공통 컴포넌트
+
+[테스트/품질 게이트]
+- 백엔드: JUnit5 + MockMvc로 /auth, /tasks, /webhooks/github 최소 1개 이상 통합테스트
+- 프론트: 라우팅/칸반 렌더/로그인 폼 제출 스냅샷/동작 테스트
+- ESLint/Prettier 설정과 npm script, Maven 테스트 통과
+
+[보안/정책]
+- 최소 PII(이메일/표시명/역할만 저장). 비밀번호는 BCrypt 해시
+- Webhook 비밀키 .env로 분리, 10MB 초과 파일 업로드 제한(샘플 구현)
+- 감사로그: 권한 변경, 삭제, Webhook 실패 이벤트 로깅
+
+[산출물]
+- 루트/README.md에 "로컬 실행 순서": docker-compose up → backend mvn spring-boot:run → frontend npm run dev
+- docs/: API/도메인/화면 설계 요약 마크다운 초안
+- sql/: schema.sql, data.sql
+
+지금부터 다음 순서로 진행:
+Step 0. 전체 작업계획(목록/순서/리스크) 제시
+Step 1. infra/docker-compose + backend 빈 프로젝트 + frontend 빈 프로젝트 → 빌드 통과
+Step 2. 백엔티티/리포지토리/시드 → 간단 CRUD + /auth → 테스트 통과
+Step 3. RBAC + /webhooks/github(HMAC/정규식) → 테스트 통과
+Step 4. 프론트 레이아웃/라우팅/테마 → 칸반/캘린더 더미 데이터 → API 연동
+Step 5. 파일 보관함/위키 화면, D-Day/Blocked/PR 뱃지 컴포넌트
+Step 6. 도큐먼트/스크립트/CI 스켈레톤 정리
+
+각 Step은 커맨드(예: mvn -q -DskipTests=false test, npm run test, docker logs)로 검증 가능한 상태까지 만들고 결과를 요약하세요.
