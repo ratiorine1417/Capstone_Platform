@@ -6,10 +6,12 @@ import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.EventType;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.service.EventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.*;
+import java.time.LocalDate;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -27,25 +29,22 @@ public class EventController {
 
     // 목록
     @GetMapping("/events")
-    public ResponseEntity<?> list(@PathVariable Long projectId) {
+    public ResponseEntity<List<EventDto>> list(@PathVariable Long projectId) {
         return ResponseEntity.ok(eventService.listByProject(projectId));
     }
 
-    // 기간 조회: /projects/{pid}/events/range?from=...&to=...
+    // 기간 조회: /projects/{pid}/events/range?from=YYYY-MM-DD&to=YYYY-MM-DD
     @GetMapping("/events/range")
-    public ResponseEntity<?> findInRange(
+    public ResponseEntity<List<EventDto>> findInRange(
             @PathVariable Long projectId,
-            @RequestParam("from") String fromStr,
-            @RequestParam("to") String toStr
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to")   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
-        try {
-            Instant from = parseToInstant(fromStr);
-            Instant to = parseToInstant(toStr);
-            if (to.isBefore(from)) return ResponseEntity.badRequest().build();
-            return ResponseEntity.ok(eventService.findInRange(projectId, from, to));
-        } catch (DateTimeException e) {
-            return ResponseEntity.badRequest().build();
+        if (to.isBefore(from)) {
+            // 실수로 from/to 순서를 바꿔 보낸 경우 스왑
+            LocalDate tmp = from; from = to; to = tmp;
         }
+        return ResponseEntity.ok(eventService.findInRange(projectId, from, to));
     }
 
     /* ===== 쓰기 ===== */
@@ -69,14 +68,5 @@ public class EventController {
     public ResponseEntity<Void> delete(@PathVariable Long projectId, @PathVariable Long id) {
         eventService.delete(projectId, id);
         return ResponseEntity.noContent().build();
-    }
-
-    /* ===== 유틸 ===== */
-
-    private static Instant parseToInstant(String v) {
-        try { return Instant.parse(v); } catch (DateTimeException ignore) {}
-        try { return OffsetDateTime.parse(v).toInstant(); } catch (DateTimeException ignore) {}
-        var ldt = LocalDateTime.parse(v);
-        return ldt.atZone(ZoneId.systemDefault()).toInstant();
     }
 }

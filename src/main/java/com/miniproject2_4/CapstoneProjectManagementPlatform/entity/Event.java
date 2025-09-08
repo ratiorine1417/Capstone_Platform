@@ -24,7 +24,8 @@ public class Event {
     @Column(name = "start_at", nullable = false)
     private LocalDateTime startAt;
 
-    @Column(name = "end_at", nullable = false)
+    /** 종료시간은 선택값이므로 NULL 허용 */
+    @Column(name = "end_at")
     private LocalDateTime endAt;
 
     @Column(length = 100)

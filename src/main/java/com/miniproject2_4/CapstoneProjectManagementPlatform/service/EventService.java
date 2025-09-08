@@ -30,17 +30,18 @@ public class EventService {
         return events.stream().map(EventDto::from).toList();
     }
 
+    /**
+     * from/to는 LocalDate(YYYY-MM-DD)로 들어오며,
+     * 검색 윈도우는 [from 00:00, to+1일 00:00) — 겹침(overlap) 포함 검색.
+     */
     @Transactional(readOnly = true)
-    public List<EventDto> findInRange(Long projectId, Instant from, Instant to) {
+    public List<EventDto> findInRange(Long projectId, LocalDate from, LocalDate to) {
         if (projectId == null || from == null || to == null) {
             throw new IllegalArgumentException("projectId, from, to는 null일 수 없습니다.");
         }
-        if (to.isBefore(from)) {
-            var tmp = from; from = to; to = tmp;
-        }
-        var fromLdt = LocalDateTime.ofInstant(from, ZONE);
-        var toLdt   = LocalDateTime.ofInstant(to, ZONE);
-        return eventRepository.findInRange(projectId, fromLdt, toLdt)
+        LocalDateTime fromInclusive = from.atStartOfDay();           // 포함
+        LocalDateTime toExclusive   = to.plusDays(1).atStartOfDay(); // 제외
+        return eventRepository.findInRange(projectId, fromInclusive, toExclusive)
                 .stream().map(EventDto::from).toList();
     }
 
@@ -56,7 +57,7 @@ public class EventService {
         e.setTitle(nz(title));
         e.setType(type != null ? type : EventType.ETC);
         e.setStartAt(parseDateTime(startAtIso));
-        e.setEndAt(parseDateTime(endAtIso));
+        e.setEndAt(parseDateTime(endAtIso));   // null 허용
         e.setLocation(location);
         return eventRepository.save(e);
     }
@@ -71,9 +72,9 @@ public class EventService {
         if (title != null) e.setTitle(title);
         if (type != null) e.setType(type);
         if (startAtIso != null) e.setStartAt(parseDateTime(startAtIso));
-        if (endAtIso != null) e.setEndAt(parseDateTime(endAtIso));
+        if (endAtIso != null) e.setEndAt(parseDateTime(endAtIso)); // ""(빈문자) -> null로 세팅됨
         if (location != null) e.setLocation(location);
-        return e;
+        return eventRepository.save(e);
     }
 
     @Transactional
@@ -96,6 +97,7 @@ public class EventService {
         try { return LocalDateTime.ofInstant(Instant.parse(v), ZONE); } catch (DateTimeException ignore) {}
         try { return OffsetDateTime.parse(v).toLocalDateTime(); } catch (DateTimeException ignore) {}
         try { return LocalDateTime.parse(v); } catch (DateTimeException ignore) {}
+        // date-only
         var d = LocalDate.parse(v);
         return d.atStartOfDay();
     }

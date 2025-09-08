@@ -51,7 +51,7 @@ create table event (
                        project_id bigint not null,
                        title varchar(120) not null,
                        start_at datetime not null,
-                       end_at datetime not null,
+                       end_at datetime null,
                        location varchar(120),
                        type varchar(20) not null,
                        foreign key(project_id) references project(id)
