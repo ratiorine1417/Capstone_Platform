@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -17,11 +17,13 @@ import {
   GitBranch,
   CheckCircle,
   AlertCircle,
-  Video,
-  CalendarDays,
   Plus,
+  Video,
+  Clock,
 } from "lucide-react";
-import { getProjectDashboardSummary } from "@/api/dashboard";
+import {
+  getProjectDashboardSummary,
+} from "@/api/dashboard";
 import { listProjectFeedback } from "@/api/feedback";
 import { listProjects } from "@/api/projects";
 import { listTeams } from "@/api/teams";
@@ -32,72 +34,62 @@ import type {
   ProjectListDto,
   TeamListDto,
   ScheduleDto,
-  ScheduleType,
 } from "@/types/domain";
 
-interface StudentDashboardProps {
-  projectId: number;
-}
-
-/** 유틸 */
+/* ===== util ===== */
 const toYMD = (d: Date) => d.toISOString().split("T")[0];
 const addDays = (d: Date, n: number) => {
   const c = new Date(d);
   c.setDate(c.getDate() + n);
   return c;
 };
-const formatKDate = (date?: string | null, time?: string | null) => {
-  if (!date) return "N/A";
-  const iso = `${date}${time ? `T${time}:00` : "T00:00:00"}`;
-  return new Date(iso).toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-const iconByType = (t: ScheduleType, cls = "h-4 w-4") => {
-  switch (t) {
+const formatDateK = (isoOrYmd?: string | null) =>
+  isoOrYmd ? new Date(isoOrYmd).toLocaleDateString("ko-KR") : "N/A";
+
+/* 탭 타입 */
+type STab = "all" | "meeting" | "presentation" | "task" | "deadline";
+
+/* 아이콘/색상 헬퍼 */
+function TypeIcon({
+  type,
+  className = "h-4 w-4",
+}: {
+  type: ScheduleDto["type"];
+  className?: string;
+}) {
+  switch (type) {
     case "deadline":
-      return <AlertCircle className={`${cls} text-red-500`} />;
+      return <AlertCircle className={`${className} text-red-500`} />;
     case "meeting":
-      return <Users className={`${cls} text-green-500`} />;
+      return <Users className={`${className} text-green-600`} />;
     case "presentation":
-      return <Video className={`${cls} text-blue-500`} />;
+      return <Video className={`${className} text-blue-600`} />;
     case "task":
     default:
-      return <FileText className={`${cls} text-purple-500`} />;
+      return <FileText className={`${className} text-purple-600`} />;
   }
-};
-const labelByType = (t: ScheduleType) => {
-  switch (t) {
-    case "deadline":
-      return "마감";
-    case "meeting":
-      return "회의";
-    case "presentation":
-      return "발표";
-    case "task":
-    default:
-      return "작업";
-  }
-};
+}
+
+/* ===== component ===== */
+interface StudentDashboardProps {
+  projectId: number;
+}
 
 export function StudentDashboard({ projectId }: StudentDashboardProps) {
   const [project, setProject] = useState<ProjectListDto | null>(null);
   const [team, setTeam] = useState<TeamListDto | null>(null);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [upcoming, setUpcoming] = useState<ScheduleDto[]>([]); // ✅ 모든 일정 사용
   const [feedback, setFeedback] = useState<FeedbackDto[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleDto[]>([]);
+  const [tab, setTab] = useState<STab>("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       try {
         setLoading(true);
 
-        // 프로젝트/팀/대시보드/피드백
+        // 프로젝트/팀/대시보드/피드백 병렬 호출
         const [projects, teams, summaryData, feedbackData] = await Promise.all([
           listProjects(),
           listTeams(),
@@ -108,7 +100,6 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         const currentProject = projects.find((p) => p.id === projectId) ?? null;
         setProject(currentProject);
 
-        // ProjectListDto엔 teamId가 없고 team "이름"만 있음 → 이름으로 매칭
         if (currentProject?.team) {
           const currentTeam =
             teams.find((t) => t.name === currentProject.team) ?? null;
@@ -118,54 +109,60 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         setSummary(summaryData);
         setFeedback(feedbackData);
 
-        // ✅ 다가오는 일정: DB기반 /schedules/range 에서 모든 타입을 사용
+        // 일정: 앞으로 45일 범위
         const today = new Date();
-        const end = addDays(today, 45); // 앞으로 45일 범위
+        const end = addDays(today, 45);
         const rows = await listSchedulesInRange({
           from: toYMD(today),
           to: toYMD(end),
           projectId,
         });
 
-        // 날짜가 있고 오늘 이후인 모든 일정 → 시간 포함 정렬
-        const upcomingAll = rows
-          .filter((s) => s.date) // 유효한 날짜만
-          .filter((s) => s.date! >= toYMD(today)) // 과거 제외
-          .sort((a, b) => {
-            const ad = `${a.date ?? ""}${a.time ?? ""}`;
-            const bd = `${b.date ?? ""}${b.time ?? ""}`;
-            return ad.localeCompare(bd);
-          });
+        // 날짜/시간 정렬
+        const sorted = [...rows].sort((a, b) => {
+          const at = `${a.date ?? ""}${a.time ?? ""}`;
+          const bt = `${b.date ?? ""}${b.time ?? ""}`;
+          return at.localeCompare(bt);
+        });
 
-        setUpcoming(upcomingAll.slice(0, 3))
-      } catch (error) {
-        console.error("Failed to fetch student dashboard data:", error);
+        setSchedules(sorted);
+      } catch (e) {
+        console.error("Failed to load dashboard:", e);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchData();
+    })();
   }, [projectId]);
 
+  /* 카드 상단 요약 값 */
   const tasksTotal = useMemo(() => {
     if (!summary) return 0;
     const a = summary.assignments;
     return (a?.open ?? 0) + (a?.inProgress ?? 0) + (a?.closed ?? 0);
   }, [summary]);
-
   const tasksDone = summary?.assignments.closed ?? 0;
   const tasksInProgress = summary?.assignments.inProgress ?? 0;
   const progressRate = summary?.progressPct ?? 0;
-
-  // 팀이 로드되면 members.length, 아니면 대시보드 통계 fallback
   const memberCount = team ? team.members.length : summary?.memberCount ?? undefined;
+
+  /* ============ 다가오는 일정 탭 필터 ============ */
+  const upcomingItems = useMemo(() => {
+    const nowYmd = toYMD(new Date());
+
+    const byTab = (s: ScheduleDto) =>
+      tab === "all" ? true : s.type === tab;
+
+    const futureOnly = (s: ScheduleDto) =>
+      (s.date ?? "") >= nowYmd; // 오늘 이후
+
+    return schedules.filter(byTab).filter(futureOnly).slice(0, 5);
+  }, [tab, schedules]);
 
   if (loading) return <div>Loading...</div>;
 
   return (
     <div className="space-y-6">
-      {/* 상단 요약 카드 */}
+      {/* 상단 요약 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
@@ -188,9 +185,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <Users className="h-5 w-5 text-chart-2" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">
-                  {memberCount ?? "N/A"}
-                </p>
+                <p className="text-2xl font-semibold">{memberCount ?? "N/A"}</p>
                 <p className="text-sm text-muted-foreground">팀원 수</p>
               </div>
             </div>
@@ -255,9 +250,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span>
                   최종 업데이트:{" "}
-                  {project?.lastUpdate
-                    ? new Date(project.lastUpdate).toLocaleDateString("ko-KR")
-                    : "N/A"}
+                  {formatDateK(project?.lastUpdate)}
                 </span>
               </div>
             </div>
@@ -275,39 +268,75 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
           </CardContent>
         </Card>
 
-        {/* 다가오는 일정 — 모든 타입(DB 데이터) */}
+        {/* 다가오는 일정 - 탭 */}
         <Card>
           <CardHeader>
             <CardTitle>다가오는 일정</CardTitle>
             <CardDescription>회의 · 발표 · 작업 · 마감</CardDescription>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {([
+                { v: "all",    label: "전체" },
+                { v: "meeting", label: "회의" },
+                { v: "presentation", label: "발표" },
+                { v: "task", label: "작업" },
+                { v: "deadline", label: "마감" },
+              ] as { v: STab; label: string }[]).map(({ v, label }) => (
+                <Button
+                  key={v}
+                  size="sm"
+                  variant={tab === v ? "secondary" : "ghost"}
+                  onClick={() => setTab(v)}
+                  className="h-7"
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
           </CardHeader>
+
           <CardContent>
             <div className="space-y-3">
-              {upcoming.map((s) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    {iconByType(s.type)}
-                    <div>
-                      <p className="font-medium text-sm">{s.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        <span className="mr-1">{labelByType(s.type)}:</span>
-                        {formatKDate(s.date, s.time)}
-                        {s.location ? ` · ${s.location}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline">
-                    시작
-                  </Button>
-                </div>
-              ))}
+              {upcomingItems.map((item) => {
+                const dateTime =
+                  item.date
+                    ? new Date(
+                        `${item.date}T${item.time ? item.time : "00:00"}:00`
+                      )
+                    : null;
 
-              {upcoming.length === 0 && (
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <TypeIcon type={item.type} />
+                      <div>
+                        <p className="font-medium text-sm">{item.title}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-2">
+                          {dateTime && (
+                            <>
+                              <Clock className="h-3 w-3" />
+                              {dateTime.toLocaleDateString("ko-KR")}
+                              {item.time && ` ${item.time}`}
+                            </>
+                          )}
+                          {item.location && (
+                            <span className="ml-2">· {item.location}</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      시작
+                    </Button>
+                  </div>
+                );
+              })}
+
+              {upcomingItems.length === 0 && (
                 <div className="text-sm text-muted-foreground text-center py-4">
-                  예정된 일정이 없습니다.
+                  해당 분류의 예정 일정이 없습니다.
                 </div>
               )}
             </div>
@@ -315,7 +344,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
         </Card>
       </div>
 
-      {/* 캘린더 위젯(이미 백엔드 연동) */}
+      {/* 월간 캘린더 위젯 */}
       <CalendarWidget />
 
       {/* 최근 피드백 */}
@@ -339,9 +368,7 @@ export function StudentDashboard({ projectId }: StudentDashboardProps) {
                 <div className="flex items-center justify-between mb-2">
                   <Badge variant="outline">{fb.author ?? "작성자"}</Badge>
                   <span className="text-xs text-muted-foreground">
-                    {fb.createdAt
-                      ? new Date(fb.createdAt).toLocaleDateString("ko-KR")
-                      : "N/A"}
+                    {formatDateK(fb.createdAt)}
                   </span>
                 </div>
                 <p className="text-sm">{fb.content}</p>
