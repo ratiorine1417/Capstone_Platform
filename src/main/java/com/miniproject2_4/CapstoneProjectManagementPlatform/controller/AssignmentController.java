@@ -16,7 +16,7 @@ public class AssignmentController {
 
     private final AssignmentService assignmentService;
 
-    // 요청 바디를 위한 간단한 레코드 (신규 파일 없이 내부에 정의)
+    // 요청 바디를 위한 간단한 레코드
     public record CreateReq(String title, String dueDateIso, AssignmentStatus status) {}
     public record UpdateReq(String title, String dueDateIso, AssignmentStatus status) {}
 
@@ -40,7 +40,7 @@ public class AssignmentController {
     public AssignmentDto update(@PathVariable Long projectId,
                                 @PathVariable Long id,
                                 @RequestBody UpdateReq req) {
-        Assignment a = assignmentService.update(id, req.title(), req.dueDateIso(), req.status());
+        Assignment a = assignmentService.update(projectId, id, req.title(), req.dueDateIso(), req.status());
         return AssignmentDto.of(a);
     }
 
@@ -49,13 +49,13 @@ public class AssignmentController {
     public AssignmentDto changeStatus(@PathVariable Long projectId,
                                       @PathVariable Long id,
                                       @RequestParam("value") AssignmentStatus value) {
-        Assignment a = assignmentService.changeStatus(id, value);
+        Assignment a = assignmentService.changeStatus(projectId, id, value);
         return AssignmentDto.of(a);
     }
 
     // DELETE /api/projects/{projectId}/assignments/{id}
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long projectId, @PathVariable Long id) {
-        assignmentService.delete(id);
+        assignmentService.delete(projectId, id);
     }
 }

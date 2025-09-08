@@ -134,7 +134,7 @@ public class ScheduleService {
             ));
         }
 
-        // Events (startAt이 범위에 걸치는 것)
+        // Events (범위와 겹치는 것)
         var evs = (pid == null)
                 ? List.<Event>of()
                 : eventRepository.findInRange(pid, from.atStartOfDay(), to.atTime(LocalTime.MAX));

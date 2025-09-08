@@ -1,8 +1,7 @@
-// EventController.java (중요: 베이스 경로에 /api 붙이지 않기)
+// EventController.java (베이스 경로에 /api 붙이지 않기)
 package com.miniproject2_4.CapstoneProjectManagementPlatform.controller;
 
 import com.miniproject2_4.CapstoneProjectManagementPlatform.controller.dto.EventDto;
-import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.Event;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.entity.EventType;
 import com.miniproject2_4.CapstoneProjectManagementPlatform.service.EventService;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +53,7 @@ public class EventController {
     @PostMapping("/events")
     public ResponseEntity<EventDto> create(@PathVariable Long projectId,
                                            @RequestBody CreateReq req) {
-        Event e = eventService.create(projectId, req.title(), req.startAtIso(), req.endAtIso(), req.type(), req.location());
+        var e = eventService.create(projectId, req.title(), req.startAtIso(), req.endAtIso(), req.type(), req.location());
         return ResponseEntity.ok(EventDto.from(e));
     }
 
@@ -62,13 +61,13 @@ public class EventController {
     public ResponseEntity<EventDto> update(@PathVariable Long projectId,
                                            @PathVariable Long id,
                                            @RequestBody UpdateReq req) {
-        Event e = eventService.update(id, req.title(), req.startAtIso(), req.endAtIso(), req.type(), req.location());
+        var e = eventService.update(projectId, id, req.title(), req.startAtIso(), req.endAtIso(), req.type(), req.location());
         return ResponseEntity.ok(EventDto.from(e));
     }
 
     @DeleteMapping("/events/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long projectId, @PathVariable Long id) {
-        eventService.delete(id);
+        eventService.delete(projectId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -77,7 +76,7 @@ public class EventController {
     private static Instant parseToInstant(String v) {
         try { return Instant.parse(v); } catch (DateTimeException ignore) {}
         try { return OffsetDateTime.parse(v).toInstant(); } catch (DateTimeException ignore) {}
-        LocalDateTime ldt = LocalDateTime.parse(v);
+        var ldt = LocalDateTime.parse(v);
         return ldt.atZone(ZoneId.systemDefault()).toInstant();
     }
 }

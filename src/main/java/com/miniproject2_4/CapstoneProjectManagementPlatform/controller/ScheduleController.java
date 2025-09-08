@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping // context-path=/api 이므로 여기선 비움 => /api/schedules
+@RequestMapping // context-path=/api 이므로 비움 => /api/schedules
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
