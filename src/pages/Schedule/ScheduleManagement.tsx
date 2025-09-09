@@ -165,8 +165,8 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
             {userRole === "student"
               ? "내 프로젝트 일정을 확인하고 관리하세요."
               : userRole === "professor"
-              ? "담당 과목/프로젝트의 일정을 관리하세요."
-              : "전체 일정 현황을 확인하고 관리하세요."}
+                ? "담당 과목/프로젝트의 일정을 관리하세요."
+                : "전체 일정 현황을 확인하고 관리하세요."}
           </p>
         </div>
         <Button onClick={onCreateClick} disabled={!projectId}>새 일정 추가</Button>
@@ -257,8 +257,8 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
                 {selectedTab === "upcoming"
                   ? "다가오는 일정이 없습니다."
                   : selectedTab === "past"
-                  ? "지난 일정이 없습니다."
-                  : "검색 조건에 맞는 일정이 없습니다."}
+                    ? "지난 일정이 없습니다."
+                    : "검색 조건에 맞는 일정이 없습니다."}
               </p>
             </div>
           )}
@@ -273,14 +273,14 @@ export function ScheduleManagement({ userRole }: ScheduleManagementProps) {
         initial={
           editing
             ? {
-                id: parseEventId(editing.id) ?? undefined,
-                title: editing.title ?? "",
-                date: editing.date ?? "",
-                startTime: editing.time ?? "",
-                endTime: editing.endTime ?? "",
-                type: scheduleTypeToEventType(editing.type),
-                location: editing.location ?? "",
-              }
+              id: parseEventId(editing.id) ?? undefined,
+              title: editing.title ?? "",
+              date: editing.date ?? "",
+              startTime: editing.time ?? "",
+              endTime: editing.endTime ?? "",
+              type: scheduleTypeToEventType(editing.type),
+              location: editing.location ?? "",
+            }
             : undefined
         }
         onSaved={async () => {

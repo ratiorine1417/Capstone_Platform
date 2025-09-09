@@ -120,3 +120,10 @@ export interface EventDto {
   type?: EventType;
   location?: string | null;
 }
+
+/** ----- User DTO (teams API) ----- */
+export interface UserDto {
+  id: number;
+  name: string;
+  email: string;
+}

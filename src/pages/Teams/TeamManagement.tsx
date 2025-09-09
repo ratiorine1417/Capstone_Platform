@@ -10,8 +10,9 @@ import {
   CalendarDays, GitBranch, CheckCircle2,
 } from "lucide-react";
 import { UserRole } from "@/App";
-import { listTeams } from "@/api/teams";
-import type { TeamListDto } from "@/types/domain";
+import { listTeams, listInvitableUsers } from "@/api/teams";
+import type { TeamListDto, UserDto } from "@/types/domain";
+import { InviteMemberModal } from "@/components/modal/InviteMemberModal";
 
 interface TeamManagementProps {
   userRole: UserRole;
@@ -26,6 +27,12 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
   const [q, setQ] = useState("");
   const [teams, setTeams] = useState<TeamListDto[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // modal state
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState<TeamListDto | null>(null);
+  const [invitableUsers, setInvitableUsers] = useState<UserDto[]>([]);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -49,11 +56,30 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
     );
   }, [teams, q]);
 
-  const actions = (
+  const handleOpenInviteModal = async (team: TeamListDto) => {
+    setSelectedTeam(team);
+    setIsInviteModalOpen(true);
+    setIsUsersLoading(true);
+    try {
+      setInvitableUsers(await listInvitableUsers(team.id));
+    } catch (error) {
+      console.error("Failed to fetch invitable users:", error);
+    } finally {
+      setIsUsersLoading(false);
+    }
+  };
+
+  const handleCloseInviteModal = () => {
+    setIsInviteModalOpen(false);
+    setSelectedTeam(null);
+    setInvitableUsers([]);
+  };
+
+  const actions = (team: TeamListDto) => (
     <>
       {userRole === "student" && (
         <>
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => handleOpenInviteModal(team)}>
             <UserPlus className="h-4 w-4 mr-1" /> 팀원 초대
           </Button>
           <Button size="sm" variant="outline">
@@ -120,7 +146,7 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
                   </CardTitle>
                   <CardDescription>{t.description ?? "팀 소개가 없습니다."}</CardDescription>
                 </div>
-                <div className="flex gap-2">{actions}</div>
+                <div className="flex gap-2">{actions(t)}</div>
               </CardHeader>
 
               <CardContent className="space-y-4">
@@ -190,6 +216,13 @@ export function TeamManagement({ userRole }: TeamManagementProps) {
           );
         })}
 
+        <InviteMemberModal
+          isOpen={isInviteModalOpen}
+          onClose={handleCloseInviteModal}
+          team={selectedTeam}
+          users={invitableUsers}
+          isLoading={isUsersLoading}
+        />
         {!loading && filtered.length === 0 && (
           <div className="text-center text-muted-foreground py-12">표시할 팀이 없습니다.</div>
         )}
