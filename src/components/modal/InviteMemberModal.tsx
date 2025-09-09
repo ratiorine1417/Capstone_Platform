@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { UserDto } from "@/api/teams";
+import { UserDto } from "@/types/domain";
 import type { TeamListDto } from "@/types/domain";
 
 interface InviteMemberModalProps {
