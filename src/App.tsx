@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Layout/Sidebar";
 import { Header } from "@/components/Layout/Header";
 import { StudentDashboard } from "@/pages/Dashboard/StudentDashboard";
@@ -11,6 +11,20 @@ import { UserManagement } from "@/pages/Admin/UserManagement";
 import { ScheduleManagement } from "@/pages/Schedule/ScheduleManagement";
 import { http } from "@/api/http";
 
+// --- 업데이트된 부분 시작 ---
+import { LoginForm } from "@/components/Auth/LoginForm"; // 1. LoginForm 컴포넌트 import
+import { Toaster } from "@/components/ui/sonner"; // 2. Toaster 컴포넌트 import
+
+// User 인터페이스 정의
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar: string | null;
+}
+// --- 업데이트된 부분 끝 ---
+
 export type UserRole = "student" | "professor" | "admin";
 export type ActivePage =
   | "dashboard"
@@ -22,18 +36,14 @@ export type ActivePage =
   | "settings";
 
 export default function App() {
-  const [currentUser] = useState({
-    id: "1",
-    name: "김학생",
-    email: "kim@university.ac.kr",
-    role: "student" as UserRole,
-    avatar: null,
-  });
+  // --- 업데이트된 부분 시작 ---
+  // 3. currentUser 상태를 null로 시작하도록 변경
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // --- 업데이트된 부분 끝 ---
 
   const [activePage, setActivePage] = useState<ActivePage>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // 데모/샘플용: 현재 보고 있는 프로젝트 id를 고정(백엔드에 존재하는 id여야 함)
   const projectId = 1;
 
   useEffect(() => {
@@ -43,38 +53,52 @@ export default function App() {
     });
   }, []);
 
+  // --- 업데이트된 부분 시작 ---
+  // 4. 로그인/로그아웃 핸들러 함수 추가
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    setActivePage("dashboard"); // 로그인 후 대시보드로 이동
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    // 필요하다면 여기에 로그아웃 API 호출 추가
+  };
+  // --- 업데이트된 부분 끝 ---
+
+  // 5. 로그인 상태가 아닐 경우 LoginForm 렌더링
+  if (!currentUser) {
+    return (
+      <>
+        <LoginForm onLogin={handleLogin} />
+        <Toaster />
+      </>
+    );
+  }
+
   const renderMainContent = () => {
     switch (activePage) {
       case "dashboard":
-        if (currentUser.role === "student")
-          return <StudentDashboard projectId={projectId} />;
-        if (currentUser.role === "professor")
-          return <ProfessorDashboard projectId={projectId} />;
-        if (currentUser.role === "admin")
-          return <AdminDashboard projectId={projectId} />;
+        if (currentUser.role === "student") return <StudentDashboard projectId={projectId} />;
+        if (currentUser.role === "professor") return <ProfessorDashboard projectId={projectId} />;
+        if (currentUser.role === "admin") return <AdminDashboard projectId={projectId} />;
         return null;
-
+      
       case "projects":
         return <ProjectManagement userRole={currentUser.role} />;
-
+      
       case "teams":
         return <TeamManagement userRole={currentUser.role} />;
-
+      
       case "evaluation":
-        return (
-          <EvaluationSystem userRole={currentUser.role} projectId={projectId} />
-        );
-
+        return <EvaluationSystem userRole={currentUser.role} projectId={projectId} />;
+      
       case "users":
-        return currentUser.role === "admin" ? (
-          <UserManagement />
-        ) : (
-          <div>권한이 없습니다.</div>
-        );
-
+        return currentUser.role === "admin" ? <UserManagement /> : <div>권한이 없습니다.</div>;
+      
       case "schedule":
         return <ScheduleManagement userRole={currentUser.role} />;
-
+      
       default:
         return <div>페이지를 찾을 수 없습니다.</div>;
     }
@@ -88,12 +112,17 @@ export default function App() {
         onPageChange={setActivePage}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-        projectId={projectId}  // ✅ 사이드바에도 현재 프로젝트 id 전달
+        projectId={projectId}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={currentUser} />
+        {/* --- 업데이트된 부분 시작 --- */}
+        {/* 6. Header에 user 객체와 onLogout 핸들러 전달 */}
+        <Header user={currentUser} onLogout={handleLogout} />
+        {/* --- 업데이트된 부분 끝 --- */}
         <main className="flex-1 overflow-auto p-6">{renderMainContent()}</main>
       </div>
+      {/* 7. 메인 앱 레이아웃에도 Toaster 추가 */}
+      <Toaster />
     </div>
   );
 }
